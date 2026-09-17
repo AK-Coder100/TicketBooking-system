@@ -74,7 +74,7 @@ function isRealKey(key?: string): boolean {
 }
 
 function allowSimulationMode(): boolean {
-  return process.env.ENABLE_PAYMENT_SIMULATION === 'true' || process.env.NODE_ENV === 'development';
+  return process.env.ENABLE_PAYMENT_SIMULATION === 'true';
 }
 
 function getSystemBaseUrl(): string {
@@ -171,7 +171,7 @@ export class CashfreeAdapter {
     }
 
     if (!allowSimulationMode()) {
-      throw new Error('Payment Gateway Error: CASHFREE_APP_ID and CASHFREE_SECRET_KEY are not configured in environment. Live payments require valid gateway credentials.');
+      throw new Error('Payment Gateway Configuration Error: CASHFREE_APP_ID and CASHFREE_SECRET_KEY environment variables are missing or unconfigured. Please configure payment credentials in .env or set ENABLE_PAYMENT_SIMULATION=true for testing.');
     }
 
     return {
@@ -220,7 +220,7 @@ export class CashfreeAdapter {
     if (!allowSimulationMode()) {
       return {
         success: false,
-        error: 'Payment Verification Error: CASHFREE_APP_ID and CASHFREE_SECRET_KEY are not configured in production environment.'
+        error: 'Payment Verification Error: CASHFREE_APP_ID and CASHFREE_SECRET_KEY environment variables are not configured in environment.'
       };
     }
 
@@ -250,7 +250,7 @@ export class RazorpayAdapter {
     const gatewayOrderId = `order_rzp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     
     if (!isRealKey(this.keyId) && !allowSimulationMode()) {
-      throw new Error('Payment Gateway Error: RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are not configured in environment.');
+      throw new Error('Payment Gateway Configuration Error: RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET environment variables are missing or unconfigured. Please configure payment credentials in .env or set ENABLE_PAYMENT_SIMULATION=true for testing.');
     }
 
     return {
@@ -268,7 +268,7 @@ export class RazorpayAdapter {
     if (!isRealKey(this.keyId) && !allowSimulationMode()) {
       return {
         success: false,
-        error: 'Payment Verification Error: RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are not configured in production environment.'
+        error: 'Payment Verification Error: RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET environment variables are not configured in environment.'
       };
     }
 

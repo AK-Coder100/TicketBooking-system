@@ -308,11 +308,15 @@ export default function TenantCheckoutPage() {
           });
           return;
         } catch (sdkErr) {
-          console.warn('Cashfree SDK error, falling back to simulation', sdkErr);
+          console.warn('Cashfree SDK error', sdkErr);
         }
       }
 
-      setShowPaymentModal(true);
+      if (data.gatewayOrder?.env === 'simulation') {
+        setShowPaymentModal(true);
+      } else {
+        throw new Error('Payment Gateway Error: Unable to initialize payment session. Please verify payment credentials.');
+      }
     } catch (err: any) {
       setErrorMsg(err.message || 'Payment error');
     } finally {

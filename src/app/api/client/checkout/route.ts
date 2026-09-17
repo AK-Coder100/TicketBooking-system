@@ -129,17 +129,23 @@ export async function POST(request: NextRequest) {
 
     // Create gateway order
     const adapter = PaymentService.getAdapter(activeGateway);
-    const gatewayOrder = await adapter.createOrder({
-      amountPaise: breakdown.totalChargedPaise,
-      currency: 'INR',
-      customer: { name: customerName, phone: customerPhone, email: customerEmail },
-      splitDetails: {
-        tenantGatewayAccountId: primaryTier.gateway_account_id,
-        platformFeePaise: breakdown.platformFeePaise,
-        organizerNetPayoutPaise: breakdown.organizerNetPayoutPaise
-      },
-      orderId
-    });
+    let gatewayOrder: any;
+    try {
+      gatewayOrder = await adapter.createOrder({
+        amountPaise: breakdown.totalChargedPaise,
+        currency: 'INR',
+        customer: { name: customerName, phone: customerPhone, email: customerEmail },
+        splitDetails: {
+          tenantGatewayAccountId: primaryTier.gateway_account_id,
+          platformFeePaise: breakdown.platformFeePaise,
+          organizerNetPayoutPaise: breakdown.organizerNetPayoutPaise
+        },
+        orderId
+      });
+    } catch (orderErr: any) {
+      db.prepare(`UPDATE orders SET payment_status = 'FAILED' WHERE id = ?`).run(orderId);
+      return NextResponse.json({ success: false, error: orderErr.message }, { status: 400 });
+    }
 
     db.prepare(`UPDATE orders SET gateway_order_id = ? WHERE id = ?`)
       .run(gatewayOrder.gatewayOrderId, orderId);
