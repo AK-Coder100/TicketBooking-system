@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Super Admin Portal | Multi-Tenant Ticket Booking Platform</title>
+  <meta name="description" content="Global executive platform control dashboard for tenant management, payment split settlement, and aggregate metrics.">
+  <link rel="stylesheet" href="/shared/design-system.css">
+  <link rel="stylesheet" href="/admin/style.css">
+</head>
+<body>
+  <!-- Header Bar -->
+  <header class="app-header">
+    <div class="header-container">
+      <a href="/admin" class="brand-logo">
+        <div class="brand-icon">🛡️</div>
+        <span>Super Admin Executive Portal</span>
+      </a>
+      <div style="display:flex; align-items:center; gap:16px;">
+        <span class="badge badge-purple" id="platform-status-badge">● Master Platform Active</span>
+        <span style="font-size:0.85rem; color:var(--text-muted);">admin@platform.com</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="admin-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="admin-sidebar">
+      <div class="sidebar-nav">
+        <div class="nav-item active" data-tab="overview">
+          <span class="nav-icon">📊</span>
+          <span>Global Overview</span>
+        </div>
+        <div class="nav-item" data-tab="tenants">
+          <span class="nav-icon">🏢</span>
+          <span>Tenant Management</span>
+        </div>
+        <div class="nav-item" data-tab="payments">
+          <span class="nav-icon">💳</span>
+          <span>Payment & Split Rules</span>
+        </div>
+        <div class="nav-item" data-tab="orders">
+          <span class="nav-icon">🧾</span>
+          <span>Global Orders</span>
+        </div>
+      </div>
+
+      <div style="margin-top:auto; padding:16px; background:rgba(255,255,255,0.03); border-radius:var(--radius-md); border:1px solid var(--border-glass);">
+        <div style="font-size:0.78rem; font-weight:bold; color:#a5b4fc; margin-bottom:4px;">PLATFORM ENGINE</div>
+        <div style="font-size:0.82rem; color:var(--text-muted);">v2.4 High-Entropy Signatures & 10m TTL Locks</div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="admin-content">
+      
+      <!-- TAB 1: GLOBAL OVERVIEW -->
+      <section id="tab-overview" class="admin-tab-content">
+        <div class="section-header">
+          <div>
+            <h1 class="section-title">Platform Overview</h1>
+            <p class="section-desc">Aggregate GMV, developer platform cuts, and multi-tenant performance metrics.</p>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="loadOverview()">
+            🔄 Refresh Data
+          </button>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-label">Aggregate GMV (Base Sales)</div>
+            <div class="metric-value" id="stat-gmv">₹0.00</div>
+            <div class="metric-sub">Total gross event volume</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Platform Fees Collected</div>
+            <div class="metric-value" id="stat-fees" style="color:#34d399;">₹0.00</div>
+            <div class="metric-sub">Super admin developer cut (₹2/ticket)</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Total Customer Charged</div>
+            <div class="metric-value" id="stat-charged">₹0.00</div>
+            <div class="metric-sub">Including convenience surcharges</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Active Tenants / Total</div>
+            <div class="metric-value" id="stat-tenants">0 / 0</div>
+            <div class="metric-sub">Event organizers on platform</div>
+          </div>
+        </div>
+
+        <!-- Recent Transactions -->
+        <div class="glass-panel" style="padding:24px; margin-top:24px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+            <h3 style="font-size:1.15rem;">Recent Platform Orders & Split Captures</h3>
+            <span class="badge badge-green">Real-time Stream</span>
+          </div>
+          <div class="table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Tenant / Organizer</th>
+                  <th>Customer (Guest)</th>
+                  <th>Base Price</th>
+                  <th>Platform Cut (₹2)</th>
+                  <th>Convenience Fee</th>
+                  <th>Total Paid</th>
+                  <th>Gateway</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="overview-orders-tbody">
+                <tr><td colspan="9" style="text-align:center; padding:30px; color:var(--text-dim);">Loading transactions...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: TENANT MANAGEMENT -->
+      <section id="tab-tenants" class="admin-tab-content" style="display:none;">
+        <div class="section-header">
+          <div>
+            <h1 class="section-title">Tenant Management</h1>
+            <p class="section-desc">Create, inspect, suspend, and configure fee parameters per event organizer.</p>
+          </div>
+          <button class="btn btn-primary" onclick="openCreateTenantModal()">
+            <span>➕</span>
+            <span>Create New Tenant</span>
+          </button>
+        </div>
+
+        <div class="glass-panel" style="padding:24px;">
+          <div class="table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Tenant / Brand</th>
+                  <th>Slug / URL</th>
+                  <th>Gateway Account ID</th>
+                  <th>Fee Surcharge Rule</th>
+                  <th>Platform Cut</th>
+                  <th>Events</th>
+                  <th>Tickets Sold</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tenants-tbody">
+                <tr><td colspan="9" style="text-align:center; padding:30px; color:var(--text-dim);">Loading tenants...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: PAYMENT GATEWAY CONFIGURATION -->
+      <section id="tab-payments" class="admin-tab-content" style="display:none;">
+        <div class="section-header">
+          <div>
+            <h1 class="section-title">Payment Architecture & Split Settlement</h1>
+            <p class="section-desc">Configure master gateways, developer commissions, and automatic routing rules.</p>
+          </div>
+          <button class="btn btn-primary" onclick="savePaymentSettings()">
+            💾 Save Gateway Rules
+          </button>
+        </div>
+
+        <!-- Architectural Diagram Visualizer -->
+        <div class="diagram-box">
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       PAYMENT GATEWAY SERVICE LAYER PATTERN                 │
+│                                                                             │
+│                  ┌──────────────────────┐                                   │
+│                  │    Booking Engine    │                                   │
+│                  └──────────┬───────────┘                                   │
+│                             │                                               │
+│                  ┌──────────▼───────────┐                                   │
+│                  │  IPaymentGateway     │  <<Interface>>                    │
+│                  └─────┬──────────┬─────┘                                   │
+│                        │          │                                         │
+│         ┌──────────────┘          └──────────────┐                          │
+│         ▼                                        ▼                          │
+│┌───────────────────┐                  ┌───────────────────┐                 │
+││  RazorpayAdapter  │                  │  CashfreeAdapter  │                 │
+││  (Razorpay Route) │                  │  (Easy Split)     │                 │
+│└───────────────────┘                  └───────────────────┘                 │
+│                                                                             │
+│  • Platform Cut: ₹2/ticket routed to Super Admin master account             │
+│  • Organizer Share: Net ticket base price routed to tenant account          │
+│  • Surcharge: Dynamic computation (2% gateway + 18% GST)                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:24px;">
+          <!-- Active Gateway & Platform Settings -->
+          <div class="glass-panel" style="padding:24px;">
+            <h3 style="font-size:1.2rem; margin-bottom:16px;">Master Payment Gateway</h3>
+            
+            <div class="form-group">
+              <label class="form-label">Active Platform Gateway</label>
+              <select id="cfg-active-gateway" class="form-control">
+                <option value="RAZORPAY">Razorpay (Route Multi-Party Split)</option>
+                <option value="CASHFREE">Cashfree (Easy Split Marketplace)</option>
+              </select>
+              <span style="font-size:0.8rem; color:var(--text-dim); margin-top:4px;">
+                Controls which gateway adapter the Booking Engine initializes for checkout.
+              </span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Default Platform Commission per Ticket (in Paise)</label>
+              <input type="number" id="cfg-default-commission" class="form-control" value="200">
+              <span style="font-size:0.8rem; color:var(--text-dim); margin-top:4px;">
+                200 paise = Fixed ₹2.00 deduction per ticket. Can be customized per tenant.
+              </span>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+              <div class="form-group">
+                <label class="form-label">Gateway Surcharge %</label>
+                <input type="number" step="0.1" id="cfg-surcharge-percent" class="form-control" value="2.0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">GST on Gateway Fee %</label>
+                <input type="number" step="0.1" id="cfg-gst-percent" class="form-control" value="18.0">
+              </div>
+            </div>
+          </div>
+
+          <!-- Credentials & Keys -->
+          <div class="glass-panel" style="padding:24px;">
+            <h3 style="font-size:1.2rem; margin-bottom:16px;">Master Account Credentials</h3>
+
+            <div class="form-group">
+              <label class="form-label">Razorpay Master Key ID / Route Master</label>
+              <input type="text" id="cfg-rzp-key" class="form-control" value="rzp_live_master_plat_99">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Cashfree Master App ID / Easy Split</label>
+              <input type="text" id="cfg-cf-id" class="form-control" value="cf_live_master_plat_88">
+            </div>
+
+            <div style="background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.25); border-radius:var(--radius-md); padding:14px; margin-top:16px;">
+              <div style="font-weight:bold; color:#c7d2fe; font-size:0.85rem; margin-bottom:4px;">💡 Surcharge Logic Rule:</div>
+              <p style="font-size:0.82rem; color:var(--text-muted); line-height:1.4;">
+                When a tenant has <b>Pass to Customer = TRUE</b>, a distinct "Convenience Fee" line item is added to the checkout summary. When <b>FALSE</b>, the gateway charge is deducted from the organizer's net payout during settlement.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: GLOBAL ORDERS -->
+      <section id="tab-orders" class="admin-tab-content" style="display:none;">
+        <div class="section-header">
+          <div>
+            <h1 class="section-title">All Platform Orders</h1>
+            <p class="section-desc">Audit trail of customer purchases, payment IDs, and settlement splits across all tenants.</p>
+          </div>
+        </div>
+
+        <div class="glass-panel" style="padding:24px;">
+          <div class="table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Tenant</th>
+                  <th>Customer</th>
+                  <th>Phone</th>
+                  <th>Base Price</th>
+                  <th>Platform Fee</th>
+                  <th>Convenience Fee</th>
+                  <th>Total Charged</th>
+                  <th>Gateway Ref</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody id="all-orders-tbody">
+                <tr><td colspan="11" style="text-align:center; padding:30px; color:var(--text-dim);">Loading orders...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- MODAL: CREATE NEW TENANT -->
+  <div class="modal-backdrop" id="modal-create-tenant">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 style="font-size:1.2rem;">Create New Event Tenant</h3>
+        <button onclick="closeModal('modal-create-tenant')" style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer;">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Organizer / Brand Name *</label>
+          <input type="text" id="new-tenant-name" class="form-control" placeholder="e.g., Tomorrowland India, Comic Con Delhi">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Unique Slug (Subdomain / URL Path) *</label>
+          <input type="text" id="new-tenant-slug" class="form-control" placeholder="e.g., comiccon, edm-night">
+          <span style="font-size:0.78rem; color:var(--text-dim);">Landing page URL will be: domain.com/<b>slug</b></span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Payment Gateway Linked Account ID</label>
+          <input type="text" id="new-tenant-gateway-acc" class="form-control" placeholder="acc_rzp_route_123 or cf_vendor_99">
+          <span style="font-size:0.78rem; color:var(--text-dim);">Gateway account ID for automated route/split settlements</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Platform Cut per Ticket (₹)</label>
+            <input type="number" id="new-tenant-cut" class="form-control" value="2" min="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fee Bearer Rule</label>
+            <select id="new-tenant-bearer" class="form-control">
+              <option value="USER">Customer (Add Convenience Fee)</option>
+              <option value="ORGANIZER">Organizer (Absorb Fee in Payout)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Contact Email</label>
+          <input type="email" id="new-tenant-email" class="form-control" placeholder="admin@organizer.com">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Initial Admin Password</label>
+          <input type="password" id="new-tenant-pass" class="form-control" value="tenant_pass_2026">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-create-tenant')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitCreateTenant()">Create Tenant</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT TENANT -->
+  <div class="modal-backdrop" id="modal-edit-tenant">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 style="font-size:1.2rem;">Edit Tenant Gateway & Surcharge Rules</h3>
+        <button onclick="closeModal('modal-edit-tenant')" style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer;">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-tenant-id">
+        
+        <div class="form-group">
+          <label class="form-label">Organizer Name</label>
+          <input type="text" id="edit-tenant-name" class="form-control">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Gateway Linked Account ID</label>
+          <input type="text" id="edit-tenant-gateway-acc" class="form-control">
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Platform Fee (₹)</label>
+            <input type="number" id="edit-tenant-cut" class="form-control" min="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fee Bearer Rule</label>
+            <select id="edit-tenant-bearer" class="form-control">
+              <option value="USER">Customer (Convenience Fee)</option>
+              <option value="ORGANIZER">Organizer (Absorbed)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Tenant Status</label>
+          <select id="edit-tenant-status" class="form-control">
+            <option value="ACTIVE">ACTIVE (Accepting Bookings)</option>
+            <option value="SUSPENDED">SUSPENDED (Ticket Sales Blocked)</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-edit-tenant')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitEditTenant()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/shared/platform-hub.js"></script>
+  <script src="/admin/app.js"></script>
+</body>
+</html>

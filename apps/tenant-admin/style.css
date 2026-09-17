@@ -1,0 +1,197 @@
+/* Tenant Admin & Gate Scanner Styles (Mobile PWA Optimized) */
+
+.organizer-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.tenant-selector-bar {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.nav-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-glass);
+  margin-bottom: 28px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 12px 20px;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+
+.tab-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tab-btn.active {
+  color: #c7d2fe;
+  border-bottom-color: var(--primary);
+  background: rgba(99, 102, 241, 0.1);
+}
+
+/* Scanner Layout & HUD */
+.scanner-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 28px;
+}
+
+.scanner-viewfinder-card {
+  background: var(--bg-surface);
+  border: 2px solid var(--border-glass);
+  border-radius: var(--radius-xl);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: var(--shadow-lg);
+  position: relative;
+}
+
+.scanner-viewport {
+  width: 100%;
+  max-width: 380px;
+  height: 300px;
+  background: #020617;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.scanner-reticle {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  border: 2px dashed rgba(99, 102, 241, 0.6);
+  border-radius: 16px;
+  pointer-events: none;
+  box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.4);
+}
+
+.scanner-reticle::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: #6366f1;
+  box-shadow: 0 0 8px #6366f1;
+  animation: scanSweep 2s infinite ease-in-out;
+}
+
+@keyframes scanSweep {
+  0% { top: 0; }
+  50% { top: 100%; }
+  100% { top: 0; }
+}
+
+/* Scanner Status Display Box */
+.scan-result-card {
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  transition: var(--transition);
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border: 2px solid transparent;
+}
+
+.scan-result-idle {
+  background: rgba(30, 41, 59, 0.4);
+  border-color: var(--border-glass);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.scan-result-green {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: #10b981;
+  box-shadow: var(--shadow-emerald);
+}
+
+.scan-result-yellow {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: #f59e0b;
+  box-shadow: var(--shadow-amber);
+}
+
+.scan-result-red {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: #f43f5e;
+  box-shadow: var(--shadow-rose);
+}
+
+.status-badge-hero {
+  font-size: 1.4rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+/* Events Grid */
+.events-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 24px;
+}
+
+.event-organizer-card {
+  border-radius: var(--radius-lg);
+  background: var(--bg-glass-card);
+  border: 1px solid var(--border-glass);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.event-card-banner {
+  height: 140px;
+  width: 100%;
+  object-fit: cover;
+}
+
+.event-card-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+@media (max-width: 900px) {
+  .scanner-grid { grid-template-columns: 1fr; }
+  .organizer-container { padding: 14px; }
+}

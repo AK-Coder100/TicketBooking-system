@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book Event Tickets | Multi-Tenant Platform</title>
+  <meta name="description" content="Discover live music festivals, conferences, and comedy shows. Fast guest-first checkout with tamper-evident QR tickets.">
+  <link rel="stylesheet" href="/shared/design-system.css">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!-- Global Navigation Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <a href="/" class="brand-logo" id="header-brand-logo">
+        <div class="brand-icon">🎟️</div>
+        <span id="header-brand-text">TicketVault Live</span>
+      </a>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <button class="btn btn-secondary btn-sm" onclick="openWalletModal()">
+          <span>📱</span>
+          <span>My Tickets (Cross-Tenant Wallet)</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="client-container">
+    <!-- Active 10-Minute Concurrency Reservation Lock Banner -->
+    <div id="reservation-alert-bar" class="reservation-banner" style="display:none;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="font-size:1.6rem;">🔒</span>
+        <div>
+          <div style="font-weight:800; color:#fef3c7; font-size:0.95rem;">SEATS RESERVED (10-MIN CONCURRENCY LOCK ACTIVE)</div>
+          <div style="font-size:0.8rem; color:rgba(254, 243, 199, 0.8);" id="res-banner-desc">
+            Your selected tickets are temporarily held. Finish checkout before the timer expires.
+          </div>
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:0.75rem; color:#fed7aa; text-transform:uppercase;">Time Remaining</div>
+        <div class="timer-countdown" id="res-banner-timer">10:00</div>
+      </div>
+    </div>
+
+    <!-- Tenant Custom Landing Header (Rendered when viewing a specific organizer /:tenant_slug) -->
+    <div id="tenant-hero" class="tenant-hero-banner" style="display:none;">
+      <div>
+        <span class="hero-tag" id="tenant-hero-tag">Official Organizer Box Office</span>
+        <h1 class="hero-title" id="tenant-hero-title">Organizer Name</h1>
+        <p style="color:var(--text-muted); max-width:600px; font-size:0.95rem;" id="tenant-hero-desc">
+          Official ticket booking portal powered by Multi-Tenant Ticket Platform.
+        </p>
+        <div style="display:flex; gap:14px; margin-top:14px; font-size:0.85rem;" id="tenant-hero-meta">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+      <div id="tenant-badge-box">
+        <span class="badge badge-purple" id="tenant-fee-policy-badge">Direct Route Settlement</span>
+      </div>
+    </div>
+
+    <!-- Global Discovery Header (When at root /) -->
+    <div id="global-hero" style="margin-bottom:32px;">
+      <span class="hero-tag">Multi-Tenant Platform Catalog</span>
+      <h1 class="hero-title">Discover Experiences & Book Tickets</h1>
+      <p style="color:var(--text-muted); font-size:1rem; max-width:650px;">
+        Explore top electronic music arenas, technology summits, and live comedy shows with instant cryptographic QR tickets.
+      </p>
+
+      <!-- Tenant Filter Chips -->
+      <div style="display:flex; gap:8px; margin-top:20px; overflow-x:auto; padding-bottom:4px;" id="tenant-filter-bar">
+        <button class="btn btn-primary btn-sm" onclick="filterByTenant('ALL', this)">All Organizers</button>
+        <button class="btn btn-secondary btn-sm" onclick="filterByTenant('sunburn', this)">Sunburn Arena</button>
+        <button class="btn btn-secondary btn-sm" onclick="filterByTenant('techconf', this)">Tech Conclave</button>
+        <button class="btn btn-secondary btn-sm" onclick="filterByTenant('laughclub', this)">Laugh Club</button>
+      </div>
+    </div>
+
+    <!-- Events Grid Catalog -->
+    <div class="catalog-grid" id="events-catalog-grid">
+      <!-- Populated dynamically -->
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 1: STEP-BY-STEP GUEST-FIRST BOOKING & RESERVATION
+       ========================================================================= -->
+  <div class="modal-backdrop" id="modal-booking">
+    <div class="modal-dialog" style="max-width:560px;">
+      <div class="modal-header">
+        <div>
+          <span style="font-size:0.75rem; color:#818cf8; font-weight:700; text-transform:uppercase;">Guest Checkout</span>
+          <h3 style="font-size:1.25rem;" id="book-modal-title">Book Tickets</h3>
+        </div>
+        <button onclick="closeModal('modal-booking')" style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- 10-Minute Lock Timer HUD -->
+        <div id="book-timer-hud" style="display:none; background:rgba(245, 158, 11, 0.15); border:1px solid rgba(245, 158, 11, 0.35); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:0.85rem; color:#fef3c7; font-weight:600;">🔒 10-Min Temporary Reservation Lock Active</span>
+          <span class="timer-countdown" id="book-timer-countdown" style="font-size:1.1rem;">10:00</span>
+        </div>
+
+        <!-- Step 1: Session + Tier Selection -->
+        <div id="book-step-tiers">
+          <div id="book-tier-options">
+            <!-- Sessions & Tiers rendered dynamically -->
+          </div>
+
+          <div class="form-group" style="margin-top:16px;">
+            <label class="form-label">Number of Tickets</label>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <button class="btn btn-secondary btn-sm" onclick="changeQuantity(-1)">−</button>
+              <span style="font-size:1.3rem; font-weight:800; min-width:30px; text-align:center;" id="book-quantity-display">1</span>
+              <button class="btn btn-secondary btn-sm" onclick="changeQuantity(1)">+</button>
+              <span style="font-size:0.85rem; color:var(--text-dim); margin-left:8px;" id="book-available-helper">Select a ticket type</span>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" style="width:100%; margin-top:12px;" onclick="proceedToHoldReservation()">
+            <span>🔒</span>
+            <span>Reserve &amp; Continue (10-Min Lock)</span>
+          </button>
+        </div>
+
+        <!-- Step 2: Per-ticket attendee details + pricing breakdown -->
+        <div id="book-step-details" style="display:none;">
+          <!-- Primary attendee + additional attendee fields rendered by JS -->
+          <div id="primary-attendee-fields"></div>
+          <div id="additional-attendees-container"></div>
+
+          <!-- Dynamic Fee Surcharge & Platform Cut Breakdown -->
+          <div class="breakdown-box" style="margin-top:16px;">
+            <div style="font-weight:700; font-size:0.85rem; color:#a5b4fc; text-transform:uppercase; margin-bottom:6px;">
+              Price &amp; Gateway Split Summary
+            </div>
+            <div class="breakdown-row">
+              <span>Base Ticket Price (<span id="bd-qty">1</span>x)</span>
+              <span id="bd-base">₹0.00</span>
+            </div>
+            <div class="breakdown-row">
+              <span>Platform Service Fee (₹2/ticket)</span>
+              <span id="bd-platform" style="color:#34d399;">₹0.00</span>
+            </div>
+            <div class="breakdown-row" id="bd-convenience-row">
+              <span>Convenience Fee (Gateway + GST)</span>
+              <span id="bd-convenience">₹0.00</span>
+            </div>
+            <div class="breakdown-row total">
+              <span>Total Payable</span>
+              <span id="bd-total" style="color:#38bdf8;">₹0.00</span>
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-dim); margin-top:8px;" id="bd-organizer-note"></div>
+          </div>
+
+          <div style="display:flex; gap:10px; margin-top:16px;">
+            <button class="btn btn-secondary" onclick="backToTierSelection()">← Back</button>
+            <button class="btn btn-primary" style="flex:1;" onclick="initiateGatewayPayment()">
+              <span>💳</span>
+              <span>Pay with Cashfree</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 2: INTERACTIVE PAYMENT GATEWAY SIMULATOR (RAZORPAY / CASHFREE)
+       ========================================================================= -->
+  <div class="modal-backdrop" id="modal-payment-gateway">
+    <div class="modal-dialog" style="max-width:440px;">
+      <div class="modal-header" style="background:#0f172a;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:28px; height:28px; border-radius:6px; background:#6366f1; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#fff;">
+            ⚡
+          </div>
+          <div>
+            <div style="font-weight:bold; font-size:1rem;" id="pg-title">Razorpay Checkout</div>
+            <small style="color:var(--text-dim);" id="pg-subtitle">Secure Gateway Route Split</small>
+          </div>
+        </div>
+        <button onclick="closeModal('modal-payment-gateway')" style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding:24px;">
+        <div style="text-align:center; margin-bottom:20px;">
+          <div style="font-size:0.85rem; color:var(--text-dim); text-transform:uppercase;">Total Amount to Authorize</div>
+          <div style="font-size:2.2rem; font-weight:800; color:#38bdf8;" id="pg-amount-display">₹0.00</div>
+          <div style="font-size:0.8rem; color:#a5b4fc; margin-top:4px;">
+            Automatic Split Settlement Active
+          </div>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.04); border-radius:var(--radius-md); padding:14px; margin-bottom:20px; font-size:0.82rem;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+            <span style="color:var(--text-muted);">Platform Master Account:</span>
+            <span style="color:#34d399; font-weight:bold;" id="pg-split-platform">+₹2.00</span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:var(--text-muted);">Organizer Linked Account:</span>
+            <span style="color:#e2e8f0; font-weight:bold;" id="pg-split-organizer">₹0.00</span>
+          </div>
+        </div>
+
+        <p style="font-size:0.82rem; color:var(--text-dim); text-align:center; margin-bottom:16px;">
+          Simulate instantaneous gateway response for automated verification:
+        </p>
+
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <button class="btn btn-success" style="width:100%;" onclick="confirmPaymentSimulation(true)">
+            <span>✓</span>
+            <span>Simulate Successful Payment (Instant Capture)</span>
+          </button>
+          <button class="btn btn-danger" style="width:100%;" onclick="confirmPaymentSimulation(false)">
+            <span>✕</span>
+            <span>Simulate Payment Failure / Cancel</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 3: ORDER SUCCESS & CRYPTOGRAPHIC E-TICKET
+       ========================================================================= -->
+  <div class="modal-backdrop" id="modal-order-success">
+    <div class="modal-dialog" style="max-width:540px; background:var(--bg-dark);">
+      <div class="modal-header">
+        <div>
+          <span class="badge badge-green">Booking Confirmed</span>
+          <h3 style="font-size:1.25rem; margin-top:4px;">Your Official E-Ticket</h3>
+        </div>
+        <button onclick="closeModal('modal-order-success')" style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding:20px;">
+        <div class="e-ticket-card" id="e-ticket-view">
+          <div class="ticket-header-strip">
+            <div style="font-size:0.75rem; letter-spacing:0.1em; text-transform:uppercase; opacity:0.9;" id="tkt-tenant-name">ORGANIZER</div>
+            <div style="font-size:1.35rem; font-weight:800; margin-top:4px;" id="tkt-event-title">Event Title</div>
+            <div style="font-size:0.85rem; opacity:0.9; margin-top:6px;" id="tkt-event-location">📍 Location</div>
+          </div>
+
+          <div class="ticket-body-strip">
+            <div style="display:flex; justify-content:space-between; margin-bottom:14px;">
+              <div>
+                <div style="font-size:0.75rem; color:#64748b; font-weight:bold;">ATTENDEE</div>
+                <div style="font-size:1.1rem; font-weight:800; color:#0f172a;" id="tkt-attendee-name">Name</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:0.75rem; color:#64748b; font-weight:bold;">TIER</div>
+                <div style="font-size:1rem; font-weight:700; color:#4f46e5;" id="tkt-tier-name">General Pass</div>
+              </div>
+            </div>
+
+            <!-- Scannable Signed QR Code -->
+            <div class="ticket-qr-center">
+              <div id="tkt-qrcode-container" style="background:#ffffff; padding:10px; border-radius:12px; border:1px solid #e2e8f0;">
+                <!-- QR canvas / img -->
+              </div>
+              <div style="font-size:0.75rem; font-weight:bold; color:#4f46e5; margin-top:8px;">
+                PRESENT AT GATE FOR SCANNING
+              </div>
+              <div style="font-size:0.7rem; color:#64748b;">
+                Cryptographically Signed HMAC-SHA256 Token
+              </div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#475569;">
+              <span>Ticket ID: <b id="tkt-id-label">tkt_xxx</b></span>
+              <span>Order: <b id="tkt-order-label">ord_xxx</b></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Download & WhatsApp Dispatch Actions -->
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <button class="btn btn-primary" style="width:100%;" id="btn-download-pdf">
+            <span>📄</span>
+            <span>Download Official PDF Ticket</span>
+          </button>
+          <button class="btn btn-secondary" style="width:100%; border-color:rgba(16,185,129,0.4); color:#34d399;" id="btn-send-wa">
+            <span>📲</span>
+            <span>Send Ticket to WhatsApp</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 4: CROSS-TENANT "MY TICKETS" WALLET (GENERAL USER)
+       ========================================================================= -->
+  <div class="modal-backdrop" id="modal-wallet">
+    <div class="modal-dialog" style="max-width:580px;">
+      <div class="modal-header">
+        <div>
+          <span style="font-size:0.75rem; color:#818cf8; font-weight:700; text-transform:uppercase;">General User Account</span>
+          <h3 style="font-size:1.25rem;">My Tickets Across All Organizers</h3>
+        </div>
+        <button onclick="closeModal('modal-wallet')" style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Step A: Enter Phone for OTP -->
+        <div id="wallet-auth-step">
+          <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom:16px;">
+            General users are not bound to any tenant. Enter your mobile or WhatsApp number to access all tickets you've booked across any event organizer.
+          </p>
+
+          <div class="form-group">
+            <label class="form-label">Registered Mobile / WhatsApp Number</label>
+            <input type="tel" id="wallet-phone-input" class="form-control" placeholder="+91 98765 00112" value="+919876500112">
+          </div>
+
+          <div id="wallet-otp-container" style="display:none; margin-top:12px;">
+            <div class="form-group">
+              <label class="form-label">Enter Verification Code (Demo OTP: <b>123456</b>)</label>
+              <input type="text" id="wallet-otp-input" class="form-control" placeholder="123456" maxlength="6">
+            </div>
+            <button class="btn btn-success" style="width:100%;" onclick="verifyWalletOtp()">
+              Verify & View Tickets
+            </button>
+          </div>
+
+          <button class="btn btn-primary" id="btn-request-otp" style="width:100%;" onclick="requestWalletOtp()">
+            Request OTP
+          </button>
+        </div>
+
+        <!-- Step B: Cross-Tenant Tickets List -->
+        <div id="wallet-tickets-step" style="display:none;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <span style="font-size:0.85rem; color:var(--text-muted);">Verified Phone: <b id="wallet-verified-phone"></b></span>
+            <button class="btn btn-secondary btn-sm" onclick="logoutWallet()">Switch Phone</button>
+          </div>
+
+          <div id="wallet-tickets-list" style="display:flex; flex-direction:column; gap:12px; max-height:400px; overflow-y:auto;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/shared/platform-hub.js"></script>
+  <!-- Fast, lightweight client-side QR renderer -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
