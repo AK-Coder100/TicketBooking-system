@@ -199,19 +199,44 @@ export class CashfreeAdapter {
           }
         });
         const data = await res.json();
-        if (res.ok && data.order_status === 'PAID') {
+        if (res.ok && (data.order_status === 'PAID' || data.order_status === 'SUCCESS')) {
           return {
             success: true,
             gateway: 'CASHFREE',
             paymentId: data.cf_order_id || paymentId || `pay_cf_${Date.now()}`,
             verifiedAt: new Date().toISOString()
           };
-        } else {
-          return {
-            success: false,
-            error: data.message || `Payment verification failed: Cashfree order status is ${data?.order_status || 'UNPAID'}.`
-          };
         }
+
+        // Secondary check: query /orders/{order_id}/payments array
+        try {
+          const paymentsRes = await fetch(`${this.baseUrl}/orders/${orderId}/payments`, {
+            headers: {
+              'x-client-id': this.appId,
+              'x-client-secret': this.secretKey,
+              'x-api-version': this.apiVersion
+            }
+          });
+          const paymentsData = await paymentsRes.json();
+          if (paymentsRes.ok && Array.isArray(paymentsData)) {
+            const successfulPayment = paymentsData.find(p => p.payment_status === 'SUCCESS');
+            if (successfulPayment) {
+              return {
+                success: true,
+                gateway: 'CASHFREE',
+                paymentId: successfulPayment.cf_payment_id || paymentId || `pay_cf_${Date.now()}`,
+                verifiedAt: new Date().toISOString()
+              };
+            }
+          }
+        } catch (subErr) {
+          console.warn('Cashfree payments list lookup warning:', subErr);
+        }
+
+        return {
+          success: false,
+          error: data.message || `Cashfree payment status is ${data?.order_status || 'UNPAID'}.`
+        };
       } catch (err: any) {
         return { success: false, error: `Cashfree payment verification error: ${err.message}` };
       }

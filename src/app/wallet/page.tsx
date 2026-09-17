@@ -63,6 +63,26 @@ export default function GeneralUserWalletPage() {
     }
   };
 
+  const handleSendWhatsApp = async (ticketId: string) => {
+    try {
+      setSuccessMsg(null);
+      setErrorMsg(null);
+      const res = await fetch(`/api/client/tickets/${ticketId}/whatsapp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phone.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMsg(`Ticket pass dispatched to WhatsApp (+${phone})!`);
+      } else {
+        setErrorMsg(data.error || 'Failed to dispatch WhatsApp ticket');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'WhatsApp request error');
+    }
+  };
+
   return (
     <div style={{ maxWidth: 680, margin: '0 auto', padding: '36px 20px' }}>
       <div style={{ marginBottom: 28 }}>
@@ -175,6 +195,9 @@ export default function GeneralUserWalletPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--border-glass)' }}>
                     <code style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{t.id}</code>
                     <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => handleSendWhatsApp(t.id)} className="btn btn-primary btn-sm">
+                        💬 Send to WhatsApp
+                      </button>
                       <a href={`/api/client/tickets/${t.id}/pdf`} className="btn btn-secondary btn-sm">
                         📄 Download PDF
                       </a>

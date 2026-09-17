@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { consumeReservation } from '@/lib/reservation';
 import { PaymentService } from '@/lib/payment';
 import { generateTicketToken } from '@/lib/crypto';
+import { sendWhatsAppTicketMessage } from '@/lib/whatsapp';
 import crypto from 'node:crypto';
 
 export async function POST(request: NextRequest) {
@@ -25,13 +26,13 @@ export async function POST(request: NextRequest) {
     // Verify payment with gateway adapter
     const adapter = PaymentService.getAdapter(order.gateway_type);
     const verification = await adapter.verifyPayment({
-      orderId,
+      orderId: order.gateway_order_id || orderId,
       paymentId: paymentId || `pay_cf_live_${Date.now()}`
     });
 
     if (!verification.success) {
       db.prepare(`UPDATE orders SET payment_status = 'FAILED' WHERE id = ?`).run(orderId);
-      return NextResponse.json({ success: false, error: 'Payment authorization failed' }, { status: 400 });
+      return NextResponse.json({ success: false, error: verification.error || 'Payment authorization failed' }, { status: 400 });
     }
 
     const now = new Date().toISOString();
@@ -103,6 +104,11 @@ export async function POST(request: NextRequest) {
         attendee_name: attendeeName,
         attendee_age: attendeeAge,
         qr_secret_token: token
+      });
+
+      // Automatically dispatch WhatsApp ticket message with PNG image header
+      sendWhatsAppTicketMessage({ ticketId, toPhone: order.customer_phone }).catch(err => {
+        console.warn(`WhatsApp dispatch error for ticket ${ticketId}:`, err);
       });
     }
 
