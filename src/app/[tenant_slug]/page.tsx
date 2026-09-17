@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { db, initSchema } from '@/lib/db';
 
 interface Props {
   params: Promise<{ tenant_slug: string }>;
@@ -6,17 +7,20 @@ interface Props {
 
 export default async function TenantLandingPage({ params }: Props) {
   const { tenant_slug } = await params;
+  initSchema();
   
-  let tenantData: any = null;
+  let tenant: any = null;
+  let events: any[] = [];
   try {
-    const res = await fetch(`${process.env.BASE_URL || 'http://localhost:5000'}/api/client/tenants/${tenant_slug}`, { cache: 'no-store' });
-    const json = await res.json();
-    if (json.success) tenantData = json;
+    tenant = db.prepare(`SELECT id, name, slug, status, contact_email, contact_phone FROM tenants WHERE slug = ? AND status = 'ACTIVE'`).get(tenant_slug);
+    if (tenant) {
+      events = db.prepare(`SELECT * FROM events WHERE tenant_id = ? AND is_published = 1 ORDER BY start_date ASC`).all(tenant.id);
+    }
   } catch (e) {
     console.error(e);
   }
 
-  if (!tenantData) {
+  if (!tenant) {
     return (
       <div style={{ padding: 60, textAlign: 'center' }}>
         <h1 style={{ fontSize: '1.8rem' }}>Organizer Not Found</h1>
@@ -25,8 +29,6 @@ export default async function TenantLandingPage({ params }: Props) {
       </div>
     );
   }
-
-  const { tenant, events } = tenantData;
 
   return (
     <div style={{ maxWidth: 1120, margin: '0 auto', padding: '36px 20px' }}>

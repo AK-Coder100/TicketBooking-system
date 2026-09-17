@@ -3,12 +3,18 @@ import path from 'node:path';
 import fs from 'node:fs';
 import bcrypt from 'bcryptjs';
 
-const dbDir = path.join(process.cwd(), 'data');
+const isVercel = process.env.VERCEL === '1' || Boolean(process.env.VERCEL_ENV);
+const dbDir = isVercel ? '/tmp/data' : path.join(process.cwd(), 'data');
+
 if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
+  try {
+    fs.mkdirSync(dbDir, { recursive: true });
+  } catch (err) {
+    console.warn('Warning: Could not create db directory', err);
+  }
 }
 
-const dbPath = path.join(dbDir, 'ticket_platform.db');
+const dbPath = process.env.DB_PATH || path.join(dbDir, 'ticket_platform.db');
 export const db = new DatabaseSync(dbPath);
 
 try {
