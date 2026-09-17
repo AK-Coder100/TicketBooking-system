@@ -6,7 +6,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_multi_tenant_jwt_sign
 const secretKey = new TextEncoder().encode(JWT_SECRET);
 const AUTH_COOKIE = 'ticket_auth_token';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 1. Super Admin Route Protection
