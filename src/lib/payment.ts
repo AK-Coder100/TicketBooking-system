@@ -67,6 +67,16 @@ export function computeSplitRules({
   };
 }
 
+function isRealKey(key?: string): boolean {
+  if (!key) return false;
+  const k = key.trim().toLowerCase();
+  return k.length > 5 && !k.includes('your_') && !k.includes('placeholder') && !k.includes('change_me');
+}
+
+function allowSimulationMode(): boolean {
+  return process.env.ENABLE_PAYMENT_SIMULATION === 'true' || process.env.NODE_ENV === 'development';
+}
+
 export class CashfreeAdapter {
   appId: string;
   secretKey: string;
@@ -104,21 +114,18 @@ export class CashfreeAdapter {
       order_amount: Number((amountPaise / 100).toFixed(2)),
       order_currency: currency || 'INR',
       customer_details: {
-        customer_id: `cust_${customer.phone.replace(/[^0-9]/g, '') || Date.now()}`,
+        customer_id: `cust_${customer.phone?.replace(/[^0-9]/g, '') || Date.now()}`,
         customer_name: customer.name || 'Guest Attendee',
-        customer_phone: customer.phone.slice(-10),
+        customer_phone: (customer.phone || '9876543210').slice(-10),
         customer_email: customer.email || 'tickets@platform.com'
       },
       order_meta: {
         return_url: `${process.env.BASE_URL || 'http://localhost:5000'}/order-summary?order_id={order_id}`,
         notify_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/cashfree`
       }
-      // Note: order_splits (Easy Split) requires pre-registered vendor IDs in Cashfree dashboard.
-      // Omit here; organizer payouts are tracked in our DB and disbursed separately.
     };
 
-    // Live HTTP API call if real keys are configured (both appId and secretKey must be non-empty)
-    if (this.appId && this.secretKey) {
+    if (isRealKey(this.appId) && isRealKey(this.secretKey)) {
       try {
         const res = await fetch(`${this.baseUrl}/orders`, {
           method: 'POST',
@@ -145,19 +152,24 @@ export class CashfreeAdapter {
             organizerNetSharePaise: splitDetails.organizerNetPayoutPaise,
             checkoutConfig: payload
           };
+        } else {
+          throw new Error(data.message || 'Cashfree API credentials rejected.');
         }
       } catch (err: any) {
-        console.warn('Cashfree live API call fallback:', err.message);
+        throw new Error(`Payment Gateway Error: ${err.message}`);
       }
     }
 
-    // Simulation fallback — no real payment session
+    if (!allowSimulationMode()) {
+      throw new Error('Payment Gateway Error: CASHFREE_APP_ID and CASHFREE_SECRET_KEY are not configured in environment. Live payments require valid gateway credentials.');
+    }
+
     return {
       success: true,
       gateway: 'CASHFREE',
-      env: this.env === 'PROD' ? 'production' : 'sandbox',
+      env: 'simulation',
       gatewayOrderId,
-      paymentSessionId: null, // null = use simulation modal, not SDK
+      paymentSessionId: null,
       amountPaise,
       currency: currency || 'INR',
       superAdminCutPaise: splitDetails.platformFeePaise,
@@ -167,22 +179,70 @@ export class CashfreeAdapter {
   }
 
   async verifyPayment({ orderId, paymentId }: any) {
+    if (isRealKey(this.appId) && isRealKey(this.secretKey)) {
+      try {
+        const res = await fetch(`${this.baseUrl}/orders/${orderId}`, {
+          headers: {
+            'x-client-id': this.appId,
+            'x-client-secret': this.secretKey,
+            'x-api-version': this.apiVersion
+          }
+        });
+        const data = await res.json();
+        if (res.ok && data.order_status === 'PAID') {
+          return {
+            success: true,
+            gateway: 'CASHFREE',
+            paymentId: data.cf_order_id || paymentId || `pay_cf_${Date.now()}`,
+            verifiedAt: new Date().toISOString()
+          };
+        } else {
+          return {
+            success: false,
+            error: data.message || `Payment verification failed: Cashfree order status is ${data?.order_status || 'UNPAID'}.`
+          };
+        }
+      } catch (err: any) {
+        return { success: false, error: `Cashfree payment verification error: ${err.message}` };
+      }
+    }
+
+    if (!allowSimulationMode()) {
+      return {
+        success: false,
+        error: 'Payment Verification Error: CASHFREE_APP_ID and CASHFREE_SECRET_KEY are not configured in production environment.'
+      };
+    }
+
     return {
       success: true,
       gateway: 'CASHFREE',
-      paymentId: paymentId || `pay_cf_${Date.now()}`,
+      paymentId: paymentId || `pay_cf_sim_${Date.now()}`,
       verifiedAt: new Date().toISOString()
     };
   }
 }
 
 export class RazorpayAdapter {
+  keyId: string;
+  keySecret: string;
+
+  constructor() {
+    this.keyId = process.env.RAZORPAY_KEY_ID || '';
+    this.keySecret = process.env.RAZORPAY_KEY_SECRET || '';
+  }
+
   calculateFeeBreakdown(params: any): FeeSplitResult {
     return computeSplitRules(params);
   }
 
   async createOrder({ amountPaise, currency, customer, splitDetails, orderId }: any) {
     const gatewayOrderId = `order_rzp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    
+    if (!isRealKey(this.keyId) && !allowSimulationMode()) {
+      throw new Error('Payment Gateway Error: RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are not configured in environment.');
+    }
+
     return {
       success: true,
       gateway: 'RAZORPAY',
@@ -195,6 +255,13 @@ export class RazorpayAdapter {
   }
 
   async verifyPayment({ orderId, paymentId }: any) {
+    if (!isRealKey(this.keyId) && !allowSimulationMode()) {
+      return {
+        success: false,
+        error: 'Payment Verification Error: RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are not configured in production environment.'
+      };
+    }
+
     return {
       success: true,
       gateway: 'RAZORPAY',
