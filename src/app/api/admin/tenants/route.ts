@@ -36,8 +36,8 @@ export async function POST(request: NextRequest) {
       admin_password
     } = body;
 
-    if (!name || !slug) {
-      return NextResponse.json({ success: false, error: 'Name and slug are required' }, { status: 400 });
+    if (!name || !slug || !contact_email || !admin_password) {
+      return NextResponse.json({ success: false, error: 'Name, slug, contact email, and admin password are required.' }, { status: 400 });
     }
 
     const cleanSlug = slug.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
@@ -60,14 +60,14 @@ export async function POST(request: NextRequest) {
       fee_bearer_type || 'USER',
       parseInt(default_platform_fee, 10) || 200,
       is_gateway_fee_passed_to_customer != null ? (is_gateway_fee_passed_to_customer ? 1 : 0) : 1,
-      contact_email || null,
+      contact_email.trim(),
       contact_phone || null,
       now
     );
 
     // Create organizer admin credentials with bcrypt
     const userId = `usr_${cleanSlug}_admin`;
-    const passwordHash = bcrypt.hashSync(admin_password || 'organizer123', 10);
+    const passwordHash = bcrypt.hashSync(admin_password.trim(), 10);
 
     db.prepare(`
       INSERT INTO users (id, tenant_id, role, name, email, phone, password_hash, created_at)
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       userId,
       tenantId,
       `${name} Organizer Admin`,
-      contact_email || `${cleanSlug}@platform.com`,
+      contact_email.trim(),
       contact_phone || null,
       passwordHash,
       now

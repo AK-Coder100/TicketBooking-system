@@ -1,6 +1,12 @@
 import crypto from 'node:crypto';
 
-const SECRET_KEY = process.env.SIGNING_SECRET || 'multi_tenant_platform_secret_jwt_sign_key_2026';
+function getSigningSecret(): string {
+  const secret = process.env.SIGNING_SECRET;
+  if (!secret) {
+    throw new Error('SIGNING_SECRET environment variable is missing in configuration.');
+  }
+  return secret;
+}
 
 function base64UrlEncode(str: string): string {
   return Buffer.from(str)
@@ -21,7 +27,7 @@ function base64UrlDecode(str: string): string {
 export function generateTicketToken(payload: any): string {
   const payloadStr = JSON.stringify(payload);
   const encodedPayload = base64UrlEncode(payloadStr);
-  const hmac = crypto.createHmac('sha256', SECRET_KEY);
+  const hmac = crypto.createHmac('sha256', getSigningSecret());
   hmac.update(encodedPayload);
   const signature = hmac.digest('hex');
   return `${encodedPayload}.${signature}`;
@@ -38,7 +44,7 @@ export function verifyTicketToken(token: string): { valid: boolean; payload?: an
   }
 
   const [encodedPayload, receivedSignature] = parts;
-  const hmac = crypto.createHmac('sha256', SECRET_KEY);
+  const hmac = crypto.createHmac('sha256', getSigningSecret());
   hmac.update(encodedPayload);
   const expectedSignature = hmac.digest('hex');
 

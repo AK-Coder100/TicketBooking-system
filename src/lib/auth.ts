@@ -3,7 +3,14 @@ import bcrypt from 'bcryptjs';
 import { db } from './db';
 import { cookies } from 'next/headers';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_multi_tenant_jwt_signing_key_2026';
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is missing in configuration.');
+  }
+  return secret;
+}
+
 export const AUTH_COOKIE_NAME = 'ticket_auth_token';
 
 export interface AuthPayload {
@@ -20,7 +27,7 @@ export interface AuthPayload {
  * Sign JWT session token
  */
 export function signAuthToken(payload: AuthPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' });
 }
 
 /**
@@ -28,7 +35,7 @@ export function signAuthToken(payload: AuthPayload): string {
  */
 export function verifyAuthToken(token: string): AuthPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as AuthPayload;
+    return jwt.verify(token, getJwtSecret()) as AuthPayload;
   } catch (err) {
     return null;
   }

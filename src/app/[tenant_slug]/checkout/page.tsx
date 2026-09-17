@@ -32,8 +32,8 @@ export default function TenantCheckoutPage() {
   const [attendees, setAttendees] = useState<Attendee[]>([]);
 
   // WhatsApp receiving number & email
-  const [whatsappPhone, setWhatsappPhone] = useState('+919876500112');
-  const [custEmail, setCustEmail] = useState('vikram@example.com');
+  const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [custEmail, setCustEmail] = useState('');
 
   // Multi-step flow: 'select' -> 'attendees' -> 'status'
   const [step, setStep] = useState<'select' | 'attendees' | 'status'>('select');

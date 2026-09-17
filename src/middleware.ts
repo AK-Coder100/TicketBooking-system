@@ -2,8 +2,14 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_multi_tenant_jwt_signing_key_2026';
-const secretKey = new TextEncoder().encode(JWT_SECRET);
+function getSecretKey() {
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    throw new Error('JWT_SECRET environment variable is missing in configuration.');
+  }
+  return new TextEncoder().encode(jwtSecret);
+}
+
 const AUTH_COOKIE = 'ticket_auth_token';
 
 export async function middleware(request: NextRequest) {
@@ -24,7 +30,7 @@ export async function middleware(request: NextRequest) {
     }
 
     try {
-      const { payload } = await jwtVerify(token, secretKey);
+      const { payload } = await jwtVerify(token, getSecretKey());
       if (payload.role !== 'SUPER_ADMIN') {
         const loginUrl = new URL('/admin/login', request.url);
         loginUrl.searchParams.set('error', 'unauthorized_role');
@@ -52,7 +58,7 @@ export async function middleware(request: NextRequest) {
     }
 
     try {
-      const { payload } = await jwtVerify(token, secretKey);
+      const { payload } = await jwtVerify(token, getSecretKey());
       if (payload.role !== 'TENANT_ADMIN' && payload.role !== 'SUPER_ADMIN') {
         const loginUrl = new URL('/organizer/login', request.url);
         loginUrl.searchParams.set('error', 'unauthorized_role');
@@ -72,7 +78,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 });
     }
     try {
-      const { payload } = await jwtVerify(token, secretKey);
+      const { payload } = await jwtVerify(token, getSecretKey());
       if (payload.role !== 'SUPER_ADMIN') {
         return NextResponse.json({ success: false, error: 'Super Admin privileges required' }, { status: 403 });
       }
@@ -87,7 +93,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 });
     }
     try {
-      const { payload } = await jwtVerify(token, secretKey);
+      const { payload } = await jwtVerify(token, getSecretKey());
       if (payload.role !== 'TENANT_ADMIN' && payload.role !== 'SUPER_ADMIN') {
         return NextResponse.json({ success: false, error: 'Organizer privileges required' }, { status: 403 });
       }
