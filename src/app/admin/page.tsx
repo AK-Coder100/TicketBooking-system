@@ -9,6 +9,8 @@ export default function SuperAdminDashboard() {
   const [data, setData] = useState<any>(null);
   const [tenants, setTenants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // New tenant modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -89,11 +91,12 @@ export default function SuperAdminDashboard() {
         });
         loadTenants();
         loadOverview();
+        setSuccessMsg(`Organization '${newTenant.name}' created successfully!`);
       } else {
-        alert(json.error);
+        setErrorMsg(json.error || 'Failed to create organization');
       }
     } catch (err: any) {
-      alert(err.message);
+      setErrorMsg(err.message || 'Error creating organization');
     }
   };
 
@@ -108,16 +111,24 @@ export default function SuperAdminDashboard() {
   };
 
   const handleSaveSettings = async () => {
-    await fetch('/api/admin/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        active_gateway: activeGateway,
-        default_commission_paise: parseInt(commissionPaise, 10)
-      })
-    });
-    alert('Settings updated successfully!');
-    loadOverview();
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          active_gateway: activeGateway,
+          default_commission_paise: parseInt(commissionPaise, 10)
+        })
+      });
+      if (res.ok) {
+        setSuccessMsg('Platform settings updated successfully!');
+        loadOverview();
+      } else {
+        setErrorMsg('Failed to save settings');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error saving settings');
+    }
   };
 
   if (loading) {
@@ -142,6 +153,21 @@ export default function SuperAdminDashboard() {
           <button className="btn btn-secondary btn-sm" onClick={handleLogout}>Log Out</button>
         </div>
       </div>
+
+      {/* Glassmorphic Toast Notifications */}
+      {errorMsg && (
+        <div style={{ background: 'rgba(244, 63, 94, 0.15)', border: '1px solid rgba(244, 63, 94, 0.4)', borderRadius: 10, margin: '14px 28px 0', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', color: '#fca5a5' }}>
+          <span>⚠️ {errorMsg}</span>
+          <button onClick={() => setErrorMsg(null)} style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: '1.1rem' }}>&times;</button>
+        </div>
+      )}
+
+      {successMsg && (
+        <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: 10, margin: '14px 28px 0', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', color: '#6ee7b7' }}>
+          <span>✅ {successMsg}</span>
+          <button onClick={() => setSuccessMsg(null)} style={{ background: 'none', border: 'none', color: '#6ee7b7', cursor: 'pointer', fontSize: '1.1rem' }}>&times;</button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', flex: 1 }}>
         {/* Sidebar Nav */}

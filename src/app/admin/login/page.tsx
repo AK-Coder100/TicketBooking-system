@@ -6,8 +6,8 @@ import Link from 'next/link';
 
 export default function SuperAdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('admin@platform.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -20,7 +20,7 @@ export default function SuperAdminLoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email: email.trim(), password })
       });
 
       const data = await res.json();
@@ -66,7 +66,7 @@ export default function SuperAdminLoginPage() {
               className="form-control"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@platform.com"
+              placeholder="admin@yourdomain.com"
               required
             />
           </div>
@@ -88,13 +88,7 @@ export default function SuperAdminLoginPage() {
           </button>
         </form>
 
-        <div style={{ marginTop: 24, padding: 14, background: 'rgba(255, 255, 255, 0.03)', borderRadius: 8, border: '1px solid var(--border-glass)', fontSize: '0.8rem', color: 'var(--text-dim)' }}>
-          <div style={{ fontWeight: 'bold', color: '#c7d2fe', marginBottom: 4 }}>🔑 Demo Super Admin Credentials:</div>
-          <div>Email: <code style={{ color: '#fff' }}>admin@platform.com</code></div>
-          <div>Password: <code style={{ color: '#fff' }}>admin123</code></div>
-        </div>
-
-        <div style={{ marginTop: 18, textAlign: 'center', fontSize: '0.85rem' }}>
+        <div style={{ marginTop: 24, textAlign: 'center', fontSize: '0.85rem' }}>
           <Link href="/organizer/login" style={{ color: '#818cf8', textDecoration: 'none' }}>
             Looking for Organizer Login? Click here ↗
           </Link>

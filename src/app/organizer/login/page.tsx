@@ -6,8 +6,8 @@ import Link from 'next/link';
 
 export default function OrganizerLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('rohan@sunburn.in');
-  const [password, setPassword] = useState('organizer123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -20,7 +20,7 @@ export default function OrganizerLoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email: email.trim(), password })
       });
 
       const data = await res.json();
@@ -66,7 +66,7 @@ export default function OrganizerLoginPage() {
               className="form-control"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="rohan@sunburn.in"
+              placeholder="organizer@yourdomain.com"
               required
             />
           </div>
@@ -88,13 +88,7 @@ export default function OrganizerLoginPage() {
           </button>
         </form>
 
-        <div style={{ marginTop: 24, padding: 14, background: 'rgba(255, 255, 255, 0.03)', borderRadius: 8, border: '1px solid var(--border-glass)', fontSize: '0.8rem', color: 'var(--text-dim)' }}>
-          <div style={{ fontWeight: 'bold', color: '#a7f3d0', marginBottom: 4 }}>🔑 Demo Organizer Credentials:</div>
-          <div>Sunburn: <code style={{ color: '#fff' }}>rohan@sunburn.in</code> / <code style={{ color: '#fff' }}>organizer123</code></div>
-          <div>Tech Summit: <code style={{ color: '#fff' }}>priya@techconf.global</code> / <code style={{ color: '#fff' }}>organizer123</code></div>
-        </div>
-
-        <div style={{ marginTop: 18, textAlign: 'center', fontSize: '0.85rem' }}>
+        <div style={{ marginTop: 24, textAlign: 'center', fontSize: '0.85rem' }}>
           <Link href="/admin/login" style={{ color: '#818cf8', textDecoration: 'none' }}>
             Are you a Super Admin? Login here ↗
           </Link>

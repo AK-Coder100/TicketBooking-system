@@ -191,32 +191,29 @@ function seedData() {
   const check = (db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'SUPER_ADMIN'").get() as any)?.count;
   const now = new Date().toISOString();
 
-  // Super Admin Password: "admin123" hashed with bcrypt
-  const superAdminHash = bcrypt.hashSync('admin123', 10);
-  const organizerHash = bcrypt.hashSync('organizer123', 10);
+  const superAdminEmail = process.env.INITIAL_SUPER_ADMIN_EMAIL || 'admin@platform.com';
+  const superAdminPass = process.env.INITIAL_SUPER_ADMIN_PASSWORD || 'admin123';
+  const superAdminHash = bcrypt.hashSync(superAdminPass, 10);
 
   if (!check || check === 0) {
     db.prepare(`
       INSERT INTO users (id, tenant_id, role, name, email, phone, password_hash, created_at)
-      VALUES ('usr_superadmin', NULL, 'SUPER_ADMIN', 'Executive Super Admin', 'admin@platform.com', '+919876543210', ?, ?)
-    `).run(superAdminHash, now);
-  } else {
-    db.prepare(`UPDATE users SET password_hash = ? WHERE role = 'SUPER_ADMIN'`).run(superAdminHash);
+      VALUES ('usr_superadmin', NULL, 'SUPER_ADMIN', 'Executive Super Admin', ?, '+919876543210', ?, ?)
+    `).run(superAdminEmail, superAdminHash, now);
   }
 
-  // Check tenants
-  const tenantCheck = (db.prepare('SELECT COUNT(*) as count FROM tenants').get() as any)?.count;
-  if (!tenantCheck || tenantCheck === 0) {
-    // 1. Platform Settings
-    db.prepare(`
-      INSERT OR REPLACE INTO platform_settings (key, value, updated_at) VALUES 
-      ('active_gateway', 'CASHFREE', ?),
-      ('default_commission_paise', '200', ?),
-      ('gateway_surcharge_percent', '2.0', ?),
-      ('gst_on_fee_percent', '18.0', ?),
-      ('cashfree_app_id', 'TEST1038492819284719283749281', ?),
-      ('razorpay_key_id', 'rzp_test_platform_key', ?)
-    `).run(now, now, now, now, now, now);
+  // Platform Settings
+  db.prepare(`
+    INSERT OR IGNORE INTO platform_settings (key, value, updated_at) VALUES 
+    ('active_gateway', 'CASHFREE', ?),
+    ('default_commission_paise', '200', ?),
+    ('gateway_surcharge_percent', '2.0', ?),
+    ('gst_on_fee_percent', '18.0', ?)
+  `).run(now, now, now, now);
+
+  const organizerHash = bcrypt.hashSync('organizer123', 10);
+  const shouldSeedDemo = process.env.SEED_DEMO_DATA === 'true';
+  if (!shouldSeedDemo) return;
 
     // 2. Tenants
     const tenants = [
@@ -363,7 +360,6 @@ function seedData() {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(tr.id, tr.event_id, tr.session_id, tr.name, tr.price, tr.cap, tr.unl, tr.date, now);
     }
-  }
 }
 
 initSchema();
