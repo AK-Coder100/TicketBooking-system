@@ -5,10 +5,17 @@ import { getSession } from '@/lib/auth';
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
-    const tenantId = (session?.role === 'SUPER_ADMIN' && searchParams.get('tenantId'))
+    const tenantId = (session.role === 'SUPER_ADMIN' && searchParams.get('tenantId'))
       ? searchParams.get('tenantId')
-      : (session?.tenantId || 'ten_sunburn_01');
+      : session.tenantId;
+
+    if (!tenantId) {
+      return NextResponse.json({ success: false, error: 'No tenant context found' }, { status: 400 });
+    }
 
     const attendees: any[] = db.prepare(`
       SELECT tk.*, o.id as order_id, o.customer_name, o.customer_phone, o.customer_email, o.created_at as booked_at,
