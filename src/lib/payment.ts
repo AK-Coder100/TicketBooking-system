@@ -77,6 +77,16 @@ function allowSimulationMode(): boolean {
   return process.env.ENABLE_PAYMENT_SIMULATION === 'true' || process.env.NODE_ENV === 'development';
 }
 
+function getSystemBaseUrl(): string {
+  if (process.env.BASE_URL && !process.env.BASE_URL.includes('localhost:5000') && !process.env.BASE_URL.includes('127.0.0.1')) {
+    return process.env.BASE_URL;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return process.env.BASE_URL || 'http://localhost:5000';
+}
+
 export class CashfreeAdapter {
   appId: string;
   secretKey: string;
@@ -120,8 +130,8 @@ export class CashfreeAdapter {
         customer_email: customer.email || 'tickets@platform.com'
       },
       order_meta: {
-        return_url: `${process.env.BASE_URL || 'http://localhost:5000'}/order-summary?order_id={order_id}`,
-        notify_url: `${process.env.BASE_URL || 'http://localhost:5000'}/api/webhooks/cashfree`
+        return_url: `${getSystemBaseUrl()}/order-summary?order_id={order_id}`,
+        notify_url: `${getSystemBaseUrl()}/api/webhooks/cashfree`
       }
     };
 
