@@ -58,7 +58,7 @@ export default function OrganizerLoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleLogin}>
+        <form onSubmit={handleLogin} suppressHydrationWarning>
           <div className="form-group">
             <label className="form-label">Organizer Email</label>
             <input

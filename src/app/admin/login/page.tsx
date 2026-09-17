@@ -58,7 +58,7 @@ export default function SuperAdminLoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleLogin}>
+        <form onSubmit={handleLogin} suppressHydrationWarning>
           <div className="form-group">
             <label className="form-label">Super Admin Email</label>
             <input
