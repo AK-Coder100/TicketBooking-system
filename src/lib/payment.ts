@@ -2,6 +2,8 @@ export interface FeeSplitResult {
   basePricePaise: number;
   ticketCount: number;
   platformFeePaise: number;
+  fixedGatewayFeePaise: number;
+  variablePercentFeePaise: number;
   convenienceFeePaise: number;
   totalChargedPaise: number;
   organizerGrossPaise: number;
@@ -23,46 +25,44 @@ export function computeSplitRules({
   tenantConfig: any;
   platformSettings: any;
 }): FeeSplitResult {
-  const commissionPerTicketPaise = tenantConfig.default_platform_fee != null
+  // 3% variable surcharge percentage
+  const surchargePercent = parseFloat(platformSettings.gateway_surcharge_percent || '3.0');
+
+  // ₹1 (100 paise) fixed gateway fee per ticket
+  const fixedGatewayFeePerTicketPaise = parseInt(platformSettings.fixed_gateway_fee_paise || '100', 10);
+
+  // ₹2 (200 paise) platform fee per ticket
+  const platformFeePerTicketPaise = tenantConfig.default_platform_fee != null
     ? tenantConfig.default_platform_fee
-    : (parseInt(platformSettings.default_commission_paise, 10) || 200);
+    : (parseInt(platformSettings.default_commission_paise || '200', 10) || 200);
 
-  const platformFeePaise = commissionPerTicketPaise * ticketCount;
-  const surchargePercent = parseFloat(platformSettings.gateway_surcharge_percent || '2.0');
-  const gstPercent = parseFloat(platformSettings.gst_on_fee_percent || '18.0');
-  const effectiveSurchargeRate = (surchargePercent * (1 + gstPercent / 100)) / 100;
+  const platformFeePaise = platformFeePerTicketPaise * ticketCount;       // ₹2 * ticketCount
+  const fixedGatewayFeePaise = fixedGatewayFeePerTicketPaise * ticketCount; // ₹1 * ticketCount
 
-  const isFeePassedToCustomer = Boolean(tenantConfig.is_gateway_fee_passed_to_customer);
+  // 3% variable percentage on total base ticket price
+  const variablePercentFeePaise = Math.round(basePricePaise * (surchargePercent / 100));
 
-  let convenienceFeePaise = 0;
-  let totalChargedPaise = 0;
-  let organizerGrossPaise = basePricePaise;
-  let organizerNetPayoutPaise = basePricePaise;
-  let gatewayTransactionDeductionPaise = 0;
+  // Total Convenience Fee = (3% variable) + (₹1 gateway fee) + (₹2 platform fee)
+  const convenienceFeePaise = variablePercentFeePaise + fixedGatewayFeePaise + platformFeePaise;
 
-  if (isFeePassedToCustomer) {
-    convenienceFeePaise = Math.round((basePricePaise + platformFeePaise) * effectiveSurchargeRate);
-    totalChargedPaise = basePricePaise + platformFeePaise + convenienceFeePaise;
-    gatewayTransactionDeductionPaise = convenienceFeePaise;
-    organizerNetPayoutPaise = basePricePaise;
-  } else {
-    convenienceFeePaise = 0;
-    totalChargedPaise = basePricePaise + platformFeePaise;
-    gatewayTransactionDeductionPaise = Math.round(totalChargedPaise * effectiveSurchargeRate);
-    organizerNetPayoutPaise = Math.max(0, basePricePaise - gatewayTransactionDeductionPaise);
-  }
+  const totalChargedPaise = basePricePaise + convenienceFeePaise;
+  const organizerGrossPaise = basePricePaise;
+  const organizerNetPayoutPaise = basePricePaise;
+  const gatewayTransactionDeductionPaise = variablePercentFeePaise + fixedGatewayFeePaise;
 
   return {
     basePricePaise,
     ticketCount,
     platformFeePaise,
+    fixedGatewayFeePaise,
+    variablePercentFeePaise,
     convenienceFeePaise,
     totalChargedPaise,
     organizerGrossPaise,
     organizerNetPayoutPaise,
     gatewayTransactionDeductionPaise,
-    isFeePassedToCustomer,
-    effectiveSurchargeRatePercent: (effectiveSurchargeRate * 100).toFixed(2),
+    isFeePassedToCustomer: true,
+    effectiveSurchargeRatePercent: surchargePercent.toFixed(1),
     currency: 'INR'
   };
 }

@@ -636,15 +636,9 @@ export default function TenantCheckoutPage() {
                   <span style={{ whiteSpace: 'nowrap' }}>₹{(breakdown.basePricePaise / 100).toFixed(2)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: 'var(--text-muted)' }}>
-                  <span>Platform fee</span>
-                  <span style={{ whiteSpace: 'nowrap' }}>₹{(breakdown.platformFeePaise / 100).toFixed(2)}</span>
+                  <span>Convenience Fee (3% + ₹3)</span>
+                  <span style={{ whiteSpace: 'nowrap' }}>₹{(breakdown.convenienceFeePaise / 100).toFixed(2)}</span>
                 </div>
-                {breakdown.convenienceFeePaise > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: 'var(--text-muted)' }}>
-                    <span>Gateway fee</span>
-                    <span style={{ whiteSpace: 'nowrap' }}>₹{(breakdown.convenienceFeePaise / 100).toFixed(2)}</span>
-                  </div>
-                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 6, borderTop: '1px solid var(--border-glass)', fontWeight: 800, fontSize: '1rem', color: '#34d399' }}>
                   <span>Total:</span>
                   <span style={{ whiteSpace: 'nowrap' }}>₹{(breakdown.totalChargedPaise / 100).toFixed(2)}</span>

@@ -213,14 +213,19 @@ function seedData() {
     `).run(superAdminEmail, superAdminHash, now);
   }
 
-  // Platform Settings
+  // Platform Settings (Default: 3% Surcharge + ₹1 Gateway Fee + ₹2 Platform Fee = Convenience Fee)
   db.prepare(`
     INSERT OR IGNORE INTO platform_settings (key, value, updated_at) VALUES 
     ('active_gateway', 'CASHFREE', ?),
     ('default_commission_paise', '200', ?),
-    ('gateway_surcharge_percent', '2.0', ?),
-    ('gst_on_fee_percent', '18.0', ?)
-  `).run(now, now, now, now);
+    ('fixed_gateway_fee_paise', '100', ?),
+    ('gateway_surcharge_percent', '3.0', ?),
+    ('gst_on_fee_percent', '0', ?)
+  `).run(now, now, now, now, now);
+
+  db.prepare(`INSERT OR REPLACE INTO platform_settings (key, value, updated_at) VALUES ('gateway_surcharge_percent', '3.0', ?)`).run(now);
+  db.prepare(`INSERT OR REPLACE INTO platform_settings (key, value, updated_at) VALUES ('fixed_gateway_fee_paise', '100', ?)`).run(now);
+  db.prepare(`INSERT OR REPLACE INTO platform_settings (key, value, updated_at) VALUES ('default_commission_paise', '200', ?)`).run(now);
 
   const organizerHash = bcrypt.hashSync('organizer123', 10);
   const shouldSeedDemo = process.env.SEED_DEMO_DATA === 'true';
