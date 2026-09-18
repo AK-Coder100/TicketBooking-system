@@ -48,8 +48,8 @@ export async function sendWhatsAppTicketMessage({
 }) {
   const ticket: any = db.prepare(`
     SELECT tk.*, o.customer_phone, o.customer_name, o.id as order_id,
-           e.title as event_title, e.location as event_location, e.start_date,
-           t.name as tenant_name, tt.name as tier_name
+           e.title as event_title, e.location as event_location, e.start_date, e.end_date,
+           t.name as tenant_name, tt.name as tier_name, tt.valid_date
     FROM tickets tk
     JOIN orders o ON tk.order_id = o.id
     JOIN ticket_tiers tt ON tk.tier_id = tt.id
@@ -80,9 +80,17 @@ export async function sendWhatsAppTicketMessage({
   const templateLang = process.env.WHATSAPP_TEMPLATE_LANGUAGE || 'en_US';
 
   const baseUrl = getSystemBaseUrl();
-  const pngTicketUrl = `${baseUrl}/api/client/tickets/${ticketId}/png`;
+  const pdfTicketUrl = `${baseUrl}/api/client/tickets/${ticketId}/pdf`;
   const messageId = `wamid_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
   const now = new Date().toISOString();
+
+  const startDate = ticket.start_date ? new Date(ticket.start_date) : new Date();
+  const eventDate = isNaN(startDate.getTime())
+    ? String(ticket.start_date || 'TBA')
+    : startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const eventTime = isNaN(startDate.getTime())
+    ? 'TBA'
+    : startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
   let dispatchStatus = 'SIMULATED';
   let errorDetail: string | null = null;
@@ -113,11 +121,21 @@ export async function sendWhatsAppTicketMessage({
             type: 'header',
             parameters: [
               {
-                type: 'image',
-                image: {
-                  link: pngTicketUrl
+                type: 'document',
+                document: {
+                  link: pdfTicketUrl,
+                  filename: `ticket-${ticketId}.pdf`
                 }
               }
+            ]
+          },
+          {
+            type: 'body',
+            parameters: [
+              { type: 'text', text: eventDate },
+              { type: 'text', text: eventTime },
+              { type: 'text', text: ticket.event_location || 'TBA' },
+              { type: 'text', text: ticket.tier_name || 'Standard' }
             ]
           }
         ];
@@ -187,7 +205,7 @@ export async function sendWhatsAppTicketMessage({
       recipientPhone,
       recipientName: ticket.customer_name,
       dispatchStatus,
-      pngTicketUrl,
+      pdfTicketUrl,
       template: templateName,
       error: errorDetail
     }),
@@ -198,7 +216,7 @@ export async function sendWhatsAppTicketMessage({
     success: dispatchStatus !== 'FAILED',
     messageId,
     dispatchStatus,
-    pngTicketUrl,
+    pdfTicketUrl,
     error: errorDetail
   };
 }
