@@ -13,11 +13,15 @@ export const MERCHANT_CONFIG = {
   country: 'India',
   phones: [
     { display: '+91 9918327131', raw: '+919918327131' },
-    { display: '+91 7607137577', raw: '+917607137577' }
+    { display: '+91 7607137577', raw: '+917607137577' },
+    { display: '+91 7054488454', raw: '+917054488454' },
+    { display: '+91 8858152101', raw: '+918858152101' }
   ],
-  phoneDisplay: '+91 9918327131, +91 7607137577',
+  phoneDisplay: '+91 9918327131, +91 7607137577, +91 7054488454, +91 8858152101',
   supportEmail: 'support@neoclare.com',
-  supportHours: 'Mon–Sat, 9:00 AM – 6:00 PM IST'
+  organizerEmails: ['srproduction091@gmail.com', 'ayushpandey10985@gmail.com'],
+  supportHours: 'Mon–Sun, 9:00 AM – 9:00 PM IST',
+  organizationNames: ['RB Garment Enterprises', 'SR Production', 'Annapurna Seva Samiti']
 } as const;
 
 export const SITE_CONFIG = {
