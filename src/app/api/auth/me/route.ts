@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { AUTH_COOKIE_NAME, getSession } from '@/lib/auth';
+import { db } from '@/lib/db';
 
 export async function POST() {
   const response = NextResponse.json({ success: true, message: 'Logged out successfully' });
@@ -13,10 +14,8 @@ export async function GET() {
     return NextResponse.json({ success: false, user: null }, { status: 401 });
   }
 
-  const { db } = await import('@/lib/db');
-  const userRow: any = db.prepare('SELECT id, name, email, role, tenant_id, tenant_role, can_create_events FROM users WHERE id = ?').get(session.userId);
-
-  const tenantRow: any = session.tenantId ? db.prepare('SELECT id, name, slug, event_creation_policy FROM tenants WHERE id = ?').get(session.tenantId) : null;
+  const userRow: any = await db.prepare('SELECT id, name, email, role, tenant_id, tenant_role, can_create_events FROM users WHERE id = ?').get(session.userId);
+  const tenantRow: any = session.tenantId ? await db.prepare('SELECT id, name, slug, event_creation_policy FROM tenants WHERE id = ?').get(session.tenantId) : null;
 
   return NextResponse.json({
     success: true,

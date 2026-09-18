@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'No tenant context found' }, { status: 400 });
     }
 
-    const events: any[] = db.prepare(`
+    const events: any[] = await db.prepare(`
       SELECT e.*,
         (SELECT COUNT(*) FROM event_sessions es WHERE es.event_id = e.id) as session_count,
         (SELECT COUNT(tk.id) FROM tickets tk JOIN orders o ON tk.order_id = o.id JOIN ticket_tiers tt ON tk.tier_id = tt.id WHERE tt.event_id = e.id AND o.payment_status = 'PAID') as tickets_sold,
@@ -30,19 +30,19 @@ export async function GET(request: NextRequest) {
 
     for (const ev of events) {
       // Load sessions for this event
-      const sessions: any[] = db.prepare(`
+      const sessions: any[] = await db.prepare(`
         SELECT * FROM event_sessions WHERE event_id = ? ORDER BY sort_order ASC, session_date ASC
       `).all(ev.id);
 
       // Load tiers per session
       for (const sess of sessions) {
-        sess.tiers = db.prepare(`
+        sess.tiers = await db.prepare(`
           SELECT * FROM ticket_tiers WHERE session_id = ? ORDER BY price_in_paise ASC
         `).all(sess.id);
       }
 
       // Also load global (non-session) tiers for backward compat
-      const globalTiers = db.prepare(`
+      const globalTiers = await db.prepare(`
         SELECT * FROM ticket_tiers WHERE event_id = ? AND (session_id IS NULL OR session_id = '') ORDER BY price_in_paise ASC
       `).all(ev.id);
 
@@ -67,8 +67,8 @@ export async function POST(request: NextRequest) {
 
     // Profile Permission Check: Verify if user profile is permitted to create events
     if (session?.role !== 'SUPER_ADMIN' && session?.userId) {
-      const userRow: any = db.prepare('SELECT can_create_events, tenant_role FROM users WHERE id = ?').get(session.userId);
-      const tenantRow: any = db.prepare('SELECT event_creation_policy FROM tenants WHERE id = ?').get(tenantId);
+      const userRow: any = await db.prepare('SELECT can_create_events, tenant_role FROM users WHERE id = ?').get(session.userId);
+      const tenantRow: any = await db.prepare('SELECT event_creation_policy FROM tenants WHERE id = ?').get(tenantId);
 
       const canCreate = userRow?.can_create_events != null ? Boolean(userRow.can_create_events) : true;
       const policy = tenantRow?.event_creation_policy || 'ADMIN_ONLY';
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
 
     // Insert event
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO events (id, tenant_id, title, banner_url, description, location, start_date, end_date, is_published, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
     `).run(
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
       const s = bodySessions[si];
       const sessionId = `sess_${Date.now()}_${si}_${crypto.randomBytes(2).toString('hex')}`;
 
-      insertSession.run(
+      await insertSession.run(
         sessionId,
         eventId,
         s.name.trim(),
@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
         const isUnlimited = t.is_unlimited ? 1 : 0;
         const capacity = isUnlimited ? null : (parseInt(t.capacity, 10) || 100);
 
-        insertTier.run(
+        await insertTier.run(
           tierId,
           eventId,
           sessionId,

@@ -1001,11 +1001,11 @@ export default function OrganizerDashboard() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                       <div className="form-group" style={{ margin: 0, gridColumn: '1/-1' }}>
                         <label className="form-label">Event Title *</label>
-                        <input type="text" className="form-control" placeholder="e.g. Sunburn Arena 2026 — Electronic Odyssey" value={newEvent.title} onChange={e => setNewEvent(p => ({ ...p, title: e.target.value }))} required />
+                        <input type="text" className="form-control" placeholder="e.g. Dandiya Mahotsav 2026 / Live Concert" value={newEvent.title} onChange={e => setNewEvent(p => ({ ...p, title: e.target.value }))} required />
                       </div>
                       <div className="form-group" style={{ margin: 0, gridColumn: '1/-1' }}>
                         <label className="form-label">Location / Venue *</label>
-                        <input type="text" className="form-control" placeholder="e.g. Vagator Beach Arena, North Goa" value={newEvent.location} onChange={e => setNewEvent(p => ({ ...p, location: e.target.value }))} required />
+                        <input type="text" className="form-control" placeholder="e.g. KACHERI Club, Town Hall, Gorakhpur" value={newEvent.location} onChange={e => setNewEvent(p => ({ ...p, location: e.target.value }))} required />
                       </div>
                       <div className="form-group" style={{ margin: 0 }}>
                         <label className="form-label">Event Start *</label>

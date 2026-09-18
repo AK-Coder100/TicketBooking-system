@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'No tenant context found' }, { status: 400 });
     }
 
-    const attendees: any[] = db.prepare(`
+    const attendees: any[] = await db.prepare(`
       SELECT tk.*, o.id as order_id, o.customer_name, o.customer_phone, o.customer_email, o.created_at as booked_at,
              tt.name as tier_name, tt.price_in_paise, e.title as event_title, e.id as event_id
       FROM tickets tk
@@ -29,11 +29,11 @@ export async function GET(request: NextRequest) {
     `).all(tenantId);
 
     const totalTickets = attendees.length;
-    const checkedInCount = attendees.filter(a => a.checkin_count > 0).length;
+    const checkedInCount = attendees.filter(a => parseInt(a.checkin_count || '0', 10) > 0).length;
     const checkinPercentage = totalTickets > 0 ? Math.round((checkedInCount / totalTickets) * 100) : 0;
-    const grossRevenuePaise = attendees.reduce((acc, a) => acc + a.price_in_paise, 0);
+    const grossRevenuePaise = attendees.reduce((acc, a) => acc + (parseInt(a.price_in_paise || '0', 10)), 0);
 
-    const auditLogs: any[] = db.prepare(`
+    const auditLogs: any[] = await db.prepare(`
       SELECT al.*, tk.attendee_name, e.title as event_title
       FROM ticket_audit_logs al
       JOIN tickets tk ON al.ticket_id = tk.id

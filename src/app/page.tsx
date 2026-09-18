@@ -73,27 +73,37 @@ export default function HomePage() {
           LIVE EVENT PASSES &amp; DIGITAL TICKETING
         </span>
         <h1 style={{ fontSize: '2.5rem', fontWeight: 800, marginTop: 4, letterSpacing: '-0.02em' }}>
-          Discover Live Festivals, Summits &amp; Shows
+          Discover Live Festivals &amp; Events
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '1rem', maxWidth: 650, marginTop: 6 }}>
-          Explore premier electronic music arenas, technology conclaves, and live comedy specials with instant cryptographic QR passes and transparent INR (₹) pricing.
+          Book verified entry passes, select your preferred dates and ticket tiers, and receive instant cryptographic QR tickets with transparent INR (₹) pricing.
         </p>
 
-        {/* Tenant Filter Chips */}
-        <div style={{ display: 'flex', gap: 10, marginTop: 24, flexWrap: 'wrap' }}>
-          <button className={`btn btn-sm ${filter === 'ALL' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilter('ALL')}>
-            All Events
-          </button>
-          <button className={`btn btn-sm ${filter === 'sunburn' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilter('sunburn')}>
-            Sunburn Arena
-          </button>
-          <button className={`btn btn-sm ${filter === 'techconf' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilter('techconf')}>
-            Global AI Summit
-          </button>
-          <button className={`btn btn-sm ${filter === 'laughclub' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilter('laughclub')}>
-            The Laugh Club
-          </button>
-        </div>
+        {/* Dynamic Tenant Filter Chips (only when multiple organizers exist) */}
+        {(() => {
+          const uniqueTenants = Array.from(
+            new Map(events.map(e => [e.tenant_slug, { slug: e.tenant_slug, name: e.tenant_name }])).values()
+          );
+
+          if (uniqueTenants.length <= 1) return null;
+
+          return (
+            <div style={{ display: 'flex', gap: 10, marginTop: 24, flexWrap: 'wrap' }}>
+              <button className={`btn btn-sm ${filter === 'ALL' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilter('ALL')}>
+                All Events
+              </button>
+              {uniqueTenants.map(t => (
+                <button
+                  key={t.slug}
+                  className={`btn btn-sm ${filter === t.slug ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setFilter(t.slug)}
+                >
+                  {t.name}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
       {loading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Loading experiences...</div>}

@@ -39,17 +39,17 @@ export async function POST(request: NextRequest) {
     const paymentStatus = orderData.order_status || paymentData?.payment_status;
 
     if (paymentStatus === 'PAID' || paymentStatus === 'SUCCESS') {
-      const order: any = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+      const order: any = await db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
       if (order && order.payment_status !== 'PAID') {
         const now = new Date().toISOString();
         const paymentId = paymentData?.cf_payment_id || `pay_cf_wh_${Date.now()}`;
 
-        db.prepare('UPDATE orders SET payment_status = "PAID", gateway_payment_id = ? WHERE id = ?')
+        await db.prepare('UPDATE orders SET payment_status = \'PAID\', gateway_payment_id = ? WHERE id = ?')
           .run(paymentId, orderId);
 
-        const existingTickets: any = db.prepare('SELECT COUNT(*) as count FROM tickets WHERE order_id = ?').get(orderId);
-        if (!existingTickets || existingTickets.count === 0) {
-          const tenantTiers: any[] = db.prepare('SELECT tt.*, e.id as event_id FROM ticket_tiers tt JOIN events e ON tt.event_id = e.id WHERE e.tenant_id = ?').all(order.tenant_id);
+        const existingTickets: any = await db.prepare('SELECT COUNT(*) as count FROM tickets WHERE order_id = ?').get(orderId);
+        if (!existingTickets || parseInt(existingTickets.count || '0', 10) === 0) {
+          const tenantTiers: any[] = await db.prepare('SELECT tt.*, e.id as event_id FROM ticket_tiers tt JOIN events e ON tt.event_id = e.id WHERE e.tenant_id = ?').all(order.tenant_id);
           const primaryTier = tenantTiers[0] || { id: 'tier_default', event_id: 'evt_default' };
           const ticketId = `tkt_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
           const token = generateTicketToken({
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
             issuedAt: now
           });
 
-          db.prepare(`
+          await db.prepare(`
             INSERT INTO tickets (id, order_id, tier_id, attendee_name, attendee_age, qr_secret_token, checked_in_at, checkin_count, is_override_allowed, created_at)
             VALUES (?, ?, ?, ?, 25, ?, NULL, 0, 0, ?)
           `).run(ticketId, orderId, primaryTier.id, order.customer_name, token, now);

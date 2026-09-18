@@ -84,7 +84,7 @@ export async function sendWhatsAppTicketMessage({
   ticketId: string;
   toPhone?: string;
 }) {
-  const ticket: any = db
+  const ticket: any = await db
     .prepare(
       `SELECT tk.*, o.customer_phone, o.customer_name, o.id as order_id,
               e.title as event_title, e.location as event_location,
@@ -283,7 +283,7 @@ export async function sendWhatsAppTicketMessage({
 
   // ── Audit log ─────────────────────────────────────────────────────────────
   const auditId = `aud_wa_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
-  db.prepare(
+  await db.prepare(
     `INSERT INTO ticket_audit_logs (id, ticket_id, action_type, metadata, created_at)
      VALUES (?, ?, 'WHATSAPP_SENT', ?, ?)`
   ).run(

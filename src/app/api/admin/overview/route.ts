@@ -3,22 +3,27 @@ import { db } from '@/lib/db';
 
 export async function GET() {
   try {
-    const ordersPaid: any[] = db.prepare(`SELECT * FROM orders WHERE payment_status = 'PAID'`).all();
-    const gmvPaise = ordersPaid.reduce((acc, o) => acc + o.total_base_price, 0);
-    const platformFeesPaise = ordersPaid.reduce((acc, o) => acc + o.platform_fee, 0);
-    const totalChargedPaise = ordersPaid.reduce((acc, o) => acc + o.total_charged, 0);
-    const convenienceFeesPaise = ordersPaid.reduce((acc, o) => acc + o.convenience_fee, 0);
+    const ordersPaid: any[] = await db.prepare(`SELECT * FROM orders WHERE payment_status = 'PAID'`).all();
+    const gmvPaise = ordersPaid.reduce((acc, o) => acc + (parseInt(o.total_base_price, 10) || 0), 0);
+    const platformFeesPaise = ordersPaid.reduce((acc, o) => acc + (parseInt(o.platform_fee, 10) || 0), 0);
+    const totalChargedPaise = ordersPaid.reduce((acc, o) => acc + (parseInt(o.total_charged, 10) || 0), 0);
+    const convenienceFeesPaise = ordersPaid.reduce((acc, o) => acc + (parseInt(o.convenience_fee, 10) || 0), 0);
 
-    const activeTenantsCount = (db.prepare(`SELECT COUNT(*) as count FROM tenants WHERE status = 'ACTIVE'`).get() as any)?.count || 0;
-    const totalTenantsCount = (db.prepare(`SELECT COUNT(*) as count FROM tenants`).get() as any)?.count || 0;
-    const totalTicketsSold = (db.prepare(`
+    const activeTenantsRow: any = await db.prepare(`SELECT COUNT(*) as count FROM tenants WHERE status = 'ACTIVE'`).get();
+    const activeTenantsCount = parseInt(activeTenantsRow?.count || '0', 10);
+
+    const totalTenantsRow: any = await db.prepare(`SELECT COUNT(*) as count FROM tenants`).get();
+    const totalTenantsCount = parseInt(totalTenantsRow?.count || '0', 10);
+
+    const totalTicketsRow: any = await db.prepare(`
       SELECT COUNT(t.id) as count 
       FROM tickets t 
       JOIN orders o ON t.order_id = o.id 
       WHERE o.payment_status = 'PAID'
-    `).get() as any)?.count || 0;
+    `).get();
+    const totalTicketsSold = parseInt(totalTicketsRow?.count || '0', 10);
 
-    const recentOrders = db.prepare(`
+    const recentOrders = await db.prepare(`
       SELECT o.*, t.name as tenant_name, t.slug as tenant_slug 
       FROM orders o
       JOIN tenants t ON o.tenant_id = t.id
@@ -26,7 +31,7 @@ export async function GET() {
       LIMIT 12
     `).all();
 
-    const settingRows: any[] = db.prepare('SELECT key, value FROM platform_settings').all();
+    const settingRows: any[] = await db.prepare('SELECT key, value FROM platform_settings').all();
     const settings: Record<string, string> = {};
     for (const r of settingRows) {
       settings[r.key] = r.value;

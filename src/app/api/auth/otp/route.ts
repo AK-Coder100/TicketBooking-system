@@ -46,7 +46,7 @@ export async function PUT(request: NextRequest) {
     otpStore.delete(cleanPhone);
 
     // General users are NOT bound to a tenant: fetch all tickets across ALL tenants!
-    const tickets = db.prepare(`
+    const tickets = await db.prepare(`
       SELECT tk.*, o.id as order_id, o.payment_status, o.total_charged, o.created_at as purchase_date,
              tt.name as tier_name, tt.price_in_paise, tt.valid_date,
              e.title as event_title, e.location as event_location, e.start_date, e.end_date, e.banner_url,
@@ -58,7 +58,7 @@ export async function PUT(request: NextRequest) {
       JOIN tenants t ON o.tenant_id = t.id
       WHERE (o.customer_phone = ? OR o.customer_phone LIKE ?) AND o.payment_status = 'PAID'
       ORDER BY tk.created_at DESC
-    `).all(cleanPhone, `%${cleanPhone.slice(-10)}`);
+    `).all(cleanPhone, `%${cleanPhone.slice(-10)}%`);
 
     return NextResponse.json({
       success: true,

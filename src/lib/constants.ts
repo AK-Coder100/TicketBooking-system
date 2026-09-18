@@ -5,10 +5,10 @@
 
 export const MERCHANT_CONFIG = {
   legalName: 'Pappu singh',
-  operatingVenue: 'KACHERI Club, town hall, Gorakhpur, 273001',
-  fullAddress: 'KACHERI Club, town hall, Gorakhpur, 273001, Uttar Pradesh, India',
+  operatingVenue: 'KACHERI Club, town hall, Gorakhpur, 273008',
+  fullAddress: 'KACHERI Club, town hall, Gorakhpur, 273008, Uttar Pradesh, India',
   city: 'Gorakhpur',
-  pincode: '273001',
+  pincode: '273008',
   state: 'Uttar Pradesh',
   country: 'India',
   phones: [

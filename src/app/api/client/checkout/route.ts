@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Concurrency check against the primary reservation tier
-    const activeRes = getActiveReservation(sessionToken, tierId);
+    const activeRes = await getActiveReservation(sessionToken, tierId);
     if (!activeRes) {
       return NextResponse.json({
         success: false,
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     const count = attendeeList.length;
 
     // Fetch primary tier for tenant/event context
-    const primaryTier: any = db.prepare(`
+    const primaryTier: any = await db.prepare(`
       SELECT tt.*, e.id as event_id, e.title as event_title, e.tenant_id,
              t.name as tenant_name, t.default_platform_fee,
              t.is_gateway_fee_passed_to_customer, t.gateway_account_id
@@ -67,16 +67,20 @@ export async function POST(request: NextRequest) {
 
     // Calculate total base price summing each attendee's actual tier price
     const tierPriceCache: Record<string, number> = {};
-    const getTierPrice = (tId: string): number => {
+    const getTierPrice = async (tId: string): Promise<number> => {
       if (tierPriceCache[tId] !== undefined) return tierPriceCache[tId];
-      const t: any = db.prepare('SELECT price_in_paise FROM ticket_tiers WHERE id = ?').get(tId);
+      const t: any = await db.prepare('SELECT price_in_paise FROM ticket_tiers WHERE id = ?').get(tId);
       tierPriceCache[tId] = t ? t.price_in_paise : primaryTier.price_in_paise;
       return tierPriceCache[tId];
     };
 
-    const basePricePaise = attendeeList.reduce((sum, a) => sum + getTierPrice(a.tierId || tierId), 0);
+    let basePricePaise = 0;
+    for (const a of attendeeList) {
+      const p = await getTierPrice(a.tierId || tierId);
+      basePricePaise += p;
+    }
 
-    const settingRows: any[] = db.prepare('SELECT key, value FROM platform_settings').all();
+    const settingRows: any[] = await db.prepare('SELECT key, value FROM platform_settings').all();
     const platformSettings: Record<string, string> = {};
     for (const r of settingRows) platformSettings[r.key] = r.value;
 
@@ -93,21 +97,23 @@ export async function POST(request: NextRequest) {
 
     // Check or create customer
     let generalUserId: string;
-    const existingUser: any = db
+    const existingUser: any = await db
       .prepare("SELECT id FROM users WHERE phone = ? AND role = 'CUSTOMER'")
       .get(customerPhone);
     if (existingUser) {
       generalUserId = existingUser.id;
     } else {
       generalUserId = `usr_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
-      db.prepare(`
-        INSERT INTO users (id, tenant_id, role, name, email, phone, created_at)
-        VALUES (?, NULL, 'CUSTOMER', ?, ?, ?, ?)
-      `).run(generalUserId, finalCustomerName, customerEmail || null, customerPhone, now);
+      const placeholderEmail = customerEmail || `${customerPhone}@guest.neoclare.com`;
+      await db.prepare(`
+        INSERT INTO users (id, tenant_id, role, name, email, phone, password_hash, created_at)
+        VALUES (?, NULL, 'CUSTOMER', ?, ?, ?, 'GUEST_NO_PASSWORD', ?)
+        ON CONFLICT (email) DO NOTHING
+      `).run(generalUserId, finalCustomerName, placeholderEmail, customerPhone, now);
     }
 
     // Insert pending order
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO orders (id, tenant_id, user_id, customer_name, customer_phone, customer_email,
                           total_base_price, platform_fee, convenience_fee, total_charged,
                           payment_status, gateway_type, created_at)
@@ -143,11 +149,11 @@ export async function POST(request: NextRequest) {
         orderId
       });
     } catch (orderErr: any) {
-      db.prepare(`UPDATE orders SET payment_status = 'FAILED' WHERE id = ?`).run(orderId);
+      await db.prepare(`UPDATE orders SET payment_status = 'FAILED' WHERE id = ?`).run(orderId);
       return NextResponse.json({ success: false, error: orderErr.message }, { status: 400 });
     }
 
-    db.prepare(`UPDATE orders SET gateway_order_id = ? WHERE id = ?`)
+    await db.prepare(`UPDATE orders SET gateway_order_id = ? WHERE id = ?`)
       .run(gatewayOrder.gatewayOrderId, orderId);
 
     return NextResponse.json({

@@ -15,11 +15,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Order ID is required' }, { status: 400 });
     }
 
-    const order: any = db.prepare(`SELECT * FROM orders WHERE id = ?`).get(orderId);
+    const order: any = await db.prepare(`SELECT * FROM orders WHERE id = ?`).get(orderId);
     if (!order) return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
 
     if (order.payment_status === 'PAID') {
-      const existingTickets = db.prepare(`SELECT * FROM tickets WHERE order_id = ?`).all(orderId);
+      const existingTickets = await db.prepare(`SELECT * FROM tickets WHERE order_id = ?`).all(orderId);
       return NextResponse.json({ success: true, orderId, tickets: existingTickets });
     }
 
@@ -31,19 +31,19 @@ export async function POST(request: NextRequest) {
     });
 
     if (!verification.success) {
-      db.prepare(`UPDATE orders SET payment_status = 'FAILED' WHERE id = ?`).run(orderId);
+      await db.prepare(`UPDATE orders SET payment_status = 'FAILED' WHERE id = ?`).run(orderId);
       return NextResponse.json({ success: false, error: verification.error || 'Payment authorization failed' }, { status: 400 });
     }
 
     const now = new Date().toISOString();
 
     // Mark PAID
-    db.prepare(`UPDATE orders SET payment_status = 'PAID', gateway_payment_id = ? WHERE id = ?`)
+    await db.prepare(`UPDATE orders SET payment_status = 'PAID', gateway_payment_id = ? WHERE id = ?`)
       .run(verification.paymentId, orderId);
 
     // Consume active reservation for this specific tier
     if (sessionToken && body.tierId) {
-      consumeReservation(sessionToken, body.tierId);
+      await consumeReservation(sessionToken, body.tierId);
     }
 
     // Issue cryptographically signed QR tickets
@@ -60,9 +60,9 @@ export async function POST(request: NextRequest) {
     // Get the specific tier from the request
     const tierId = body.tierId;
     const bookedTier: any = tierId
-      ? db.prepare(`SELECT tt.*, e.id as event_id FROM ticket_tiers tt JOIN events e ON tt.event_id = e.id WHERE tt.id = ?`).get(tierId)
-      : (() => {
-          const tiers: any[] = db.prepare(`SELECT tt.*, e.id as event_id FROM ticket_tiers tt JOIN events e ON tt.event_id = e.id WHERE e.tenant_id = ?`).all(order.tenant_id);
+      ? await db.prepare(`SELECT tt.*, e.id as event_id FROM ticket_tiers tt JOIN events e ON tt.event_id = e.id WHERE tt.id = ?`).get(tierId)
+      : await (async () => {
+          const tiers: any[] = await db.prepare(`SELECT tt.*, e.id as event_id FROM ticket_tiers tt JOIN events e ON tt.event_id = e.id WHERE e.tenant_id = ?`).all(order.tenant_id);
           return tiers[0] || { id: 'tier_default', event_id: 'evt_default' };
         })();
 
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
       const att = attendeeList[i];
       const targetTierId = att.tierId || tierId;
       const targetTier: any = targetTierId
-        ? db.prepare(`SELECT tt.*, e.id as event_id FROM ticket_tiers tt JOIN events e ON tt.event_id = e.id WHERE tt.id = ?`).get(targetTierId) || bookedTier
+        ? (await db.prepare(`SELECT tt.*, e.id as event_id FROM ticket_tiers tt JOIN events e ON tt.event_id = e.id WHERE tt.id = ?`).get(targetTierId)) || bookedTier
         : bookedTier;
 
       const ticketId = `tkt_${Date.now()}_${i}_${crypto.randomBytes(3).toString('hex')}`;
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
         issuedAt: now
       });
 
-      insertTicket.run(
+      await insertTicket.run(
         ticketId,
         orderId,
         targetTier.id,

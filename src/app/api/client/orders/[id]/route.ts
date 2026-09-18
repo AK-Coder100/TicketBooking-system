@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const order: any = db.prepare(`
+    const order: any = await db.prepare(`
       SELECT o.*, t.name as tenant_name, t.slug as tenant_slug
       FROM orders o
       JOIN tenants t ON o.tenant_id = t.id
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     if (!order) return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
 
-    const tickets = db.prepare(`
+    const tickets = await db.prepare(`
       SELECT tk.*, tt.name as tier_name, tt.valid_date, e.title as event_title, e.location as event_location, e.start_date, e.end_date, e.banner_url
       FROM tickets tk
       JOIN ticket_tiers tt ON tk.tier_id = tt.id

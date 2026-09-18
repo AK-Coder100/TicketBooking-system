@@ -11,7 +11,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const ticket: any = db.prepare(`
+    const ticket: any = await db.prepare(`
       SELECT tk.*, o.id as order_id, o.customer_name, o.customer_phone, o.customer_email, o.gateway_type, o.created_at as booked_at,
              tt.name as tier_name, tt.price_in_paise, tt.valid_date,
              e.title as event_title, e.location as event_location, e.start_date, e.end_date,

@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Email and password are required' }, { status: 400 });
     }
 
-    const authResult = authenticateUser(email, password);
+    const authResult = await authenticateUser(email, password);
     if (!authResult.success || !authResult.user) {
       return NextResponse.json({ success: false, error: authResult.error || 'Authentication failed' }, { status: 401 });
     }

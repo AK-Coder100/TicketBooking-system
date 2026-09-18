@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Ticket ID is required' }, { status: 400 });
     }
 
-    const result = overrideCheckIn({
+    const result = await overrideCheckIn({
       ticketId,
       adminId: session?.name || session?.email || 'gate_supervisor',
       reason: reason || 'Manual Organizer Clearance'

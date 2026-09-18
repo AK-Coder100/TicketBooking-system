@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 
 export async function GET() {
   try {
-    const tenants = db.prepare(`
+    const tenants = await db.prepare(`
       SELECT t.*,
         (SELECT COUNT(*) FROM events e WHERE e.tenant_id = t.id) as events_count,
         (SELECT COUNT(tk.id) FROM tickets tk JOIN orders o ON tk.order_id = o.id WHERE o.tenant_id = t.id AND o.payment_status = 'PAID') as tickets_sold,
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     const cleanSlug = slug.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
-    const existing: any = db.prepare('SELECT id FROM tenants WHERE slug = ?').get(cleanSlug);
+    const existing: any = await db.prepare('SELECT id FROM tenants WHERE slug = ?').get(cleanSlug);
     if (existing) {
       return NextResponse.json({ success: false, error: 'Slug already taken. Please choose another.' }, { status: 400 });
     }
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     const tenantId = `ten_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
     const now = new Date().toISOString();
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO tenants (id, slug, name, gateway_account_id, fee_bearer_type, default_platform_fee, is_gateway_fee_passed_to_customer, status, contact_email, contact_phone, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?)
     `).run(
@@ -69,14 +69,15 @@ export async function POST(request: NextRequest) {
     const userId = `usr_${cleanSlug}_admin`;
     const passwordHash = bcrypt.hashSync(admin_password.trim(), 10);
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO users (id, tenant_id, role, name, email, phone, password_hash, created_at)
       VALUES (?, ?, 'TENANT_ADMIN', ?, ?, ?, ?, ?)
+      ON CONFLICT (email) DO NOTHING
     `).run(
       userId,
       tenantId,
       `${name} Organizer Admin`,
-      contact_email.trim(),
+      contact_email.trim().toLowerCase(),
       contact_phone || null,
       passwordHash,
       now

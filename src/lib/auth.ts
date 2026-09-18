@@ -44,8 +44,8 @@ export function verifyAuthToken(token: string): AuthPayload | null {
 /**
  * Authenticate credentials against database
  */
-export function authenticateUser(email: string, passwordPlain: string): { success: boolean; user?: any; error?: string } {
-  const user: any = db.prepare('SELECT * FROM users WHERE email = ? COLLATE NOCASE').get(email.trim());
+export async function authenticateUser(email: string, passwordPlain: string): Promise<{ success: boolean; user?: any; error?: string }> {
+  const user: any = await db.prepare('SELECT * FROM users WHERE LOWER(email) = LOWER(?)').get(email.trim());
   if (!user) {
     return { success: false, error: 'Invalid email or password' };
   }

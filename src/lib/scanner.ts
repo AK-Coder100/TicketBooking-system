@@ -2,7 +2,7 @@ import { db } from './db';
 import { verifyTicketToken } from './crypto';
 import crypto from 'node:crypto';
 
-export function verifyAndScanTicket({
+export async function verifyAndScanTicket({
   qrToken,
   expectedEventId,
   adminId = 'gate_operator',
@@ -30,7 +30,7 @@ export function verifyAndScanTicket({
   const { ticketId, eventId } = cryptoResult.payload;
 
   // 2. Fetch ticket with tier and event
-  const ticket: any = db.prepare(`
+  const ticket: any = await db.prepare(`
     SELECT t.*, o.payment_status, o.customer_phone, o.customer_email, tt.name as tier_name, tt.event_id, e.title as event_title
     FROM tickets t
     JOIN orders o ON t.order_id = o.id
@@ -58,7 +58,7 @@ export function verifyAndScanTicket({
   // 3. Event check
   if (expectedEventId && ticket.event_id !== expectedEventId) {
     const auditId = `aud_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO ticket_audit_logs (id, ticket_id, action_type, metadata, created_at)
       VALUES (?, ?, 'SCAN_ATTEMPT', ?, ?)
     `).run(
@@ -77,16 +77,16 @@ export function verifyAndScanTicket({
   }
 
   // 4. Status Check: Valid (Green) vs Already Scanned (Yellow)
-  if (ticket.checkin_count === 0) {
+  if (!ticket.checkin_count || ticket.checkin_count === 0) {
     // First scan -> GREEN (VALID)
-    db.prepare(`
+    await db.prepare(`
       UPDATE tickets 
       SET checked_in_at = ?, checkin_count = 1 
       WHERE id = ?
     `).run(now, ticket.id);
 
     const auditId = `aud_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO ticket_audit_logs (id, ticket_id, action_type, metadata, created_at)
       VALUES (?, ?, 'SCAN_ATTEMPT', ?, ?)
     `).run(
@@ -113,7 +113,7 @@ export function verifyAndScanTicket({
   } else {
     // Already scanned -> YELLOW WARNING
     const auditId = `aud_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO ticket_audit_logs (id, ticket_id, action_type, metadata, created_at)
       VALUES (?, ?, 'SCAN_ATTEMPT', ?, ?)
     `).run(
@@ -143,24 +143,24 @@ export function verifyAndScanTicket({
   }
 }
 
-export function overrideCheckIn({ ticketId, adminId = 'gate_admin_override', reason = 'Organizer Discretion / Re-entry' }: any) {
+export async function overrideCheckIn({ ticketId, adminId = 'gate_admin_override', reason = 'Organizer Discretion / Re-entry' }: any) {
   const now = new Date().toISOString();
 
-  const ticket: any = db.prepare(`SELECT * FROM tickets WHERE id = ?`).get(ticketId);
+  const ticket: any = await db.prepare(`SELECT * FROM tickets WHERE id = ?`).get(ticketId);
   if (!ticket) {
     return { success: false, error: 'Ticket not found' };
   }
 
   const newCount = (ticket.checkin_count || 1) + 1;
 
-  db.prepare(`
+  await db.prepare(`
     UPDATE tickets 
     SET checkin_count = ?, is_override_allowed = 1 
     WHERE id = ?
   `).run(newCount, ticketId);
 
   const auditId = `aud_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
-  db.prepare(`
+  await db.prepare(`
     INSERT INTO ticket_audit_logs (id, ticket_id, action_type, metadata, created_at)
     VALUES (?, ?, 'OVERRIDE_CHECKIN', ?, ?)
   `).run(

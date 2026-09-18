@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
-    const result = verifyAndScanTicket({
+    const result = await verifyAndScanTicket({
       qrToken,
       expectedEventId: eventId,
       adminId: session?.name || session?.email || 'gate_scanner',

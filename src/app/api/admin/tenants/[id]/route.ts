@@ -16,10 +16,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       contact_phone
     } = body;
 
-    const tenant = db.prepare('SELECT * FROM tenants WHERE id = ?').get(id);
+    const tenant = await db.prepare('SELECT * FROM tenants WHERE id = ?').get(id);
     if (!tenant) return NextResponse.json({ success: false, error: 'Tenant not found' }, { status: 404 });
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE tenants SET
         name = COALESCE(?, name),
         gateway_account_id = COALESCE(?, gateway_account_id),

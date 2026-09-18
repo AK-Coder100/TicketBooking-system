@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     const eventId = searchParams.get('id');
 
     if (eventId) {
-      const event: any = db.prepare(`
+      const event: any = await db.prepare(`
         SELECT e.*, t.name as tenant_name, t.slug as tenant_slug, t.fee_bearer_type, t.is_gateway_fee_passed_to_customer, t.default_platform_fee
         FROM events e
         JOIN tenants t ON e.tenant_id = t.id
@@ -17,28 +17,29 @@ export async function GET(request: NextRequest) {
 
       if (!event) return NextResponse.json({ success: false, error: 'Event not found' }, { status: 404 });
 
-      event.sessions = db.prepare(`SELECT * FROM event_sessions WHERE event_id = ? ORDER BY sort_order ASC, session_date ASC`).all(event.id);
-      const rawTiers: any[] = db.prepare(`
+      event.sessions = await db.prepare(`SELECT * FROM event_sessions WHERE event_id = ? ORDER BY sort_order ASC, session_date ASC`).all(event.id);
+      const rawTiers: any[] = await db.prepare(`
         SELECT tt.*, es.name as session_name, es.session_date, es.start_time, es.end_time, es.venue_note
         FROM ticket_tiers tt
         LEFT JOIN event_sessions es ON tt.session_id = es.id
         WHERE tt.event_id = ? 
         ORDER BY tt.price_in_paise ASC
       `).all(event.id);
-      event.tiers = rawTiers.map(t => {
-        const cap = getTierCapacity(t.id);
+
+      event.tiers = await Promise.all(rawTiers.map(async t => {
+        const cap = await getTierCapacity(t.id);
         return {
           ...t,
           soldCount: cap.soldCount,
           activeReservedCount: cap.activeReservedCount,
           availableCount: cap.availableCount
         };
-      });
+      }));
 
       return NextResponse.json({ success: true, event });
     }
 
-    const events: any[] = db.prepare(`
+    const events: any[] = await db.prepare(`
       SELECT e.*, t.name as tenant_name, t.slug as tenant_slug
       FROM events e
       JOIN tenants t ON e.tenant_id = t.id
@@ -47,8 +48,8 @@ export async function GET(request: NextRequest) {
     `).all();
 
     for (const ev of events) {
-      ev.sessions = db.prepare(`SELECT * FROM event_sessions WHERE event_id = ? ORDER BY sort_order ASC, session_date ASC`).all(ev.id);
-      ev.tiers = db.prepare(`
+      ev.sessions = await db.prepare(`SELECT * FROM event_sessions WHERE event_id = ? ORDER BY sort_order ASC, session_date ASC`).all(ev.id);
+      ev.tiers = await db.prepare(`
         SELECT tt.*, es.name as session_name, es.session_date, es.start_time, es.end_time, es.venue_note
         FROM ticket_tiers tt
         LEFT JOIN event_sessions es ON tt.session_id = es.id

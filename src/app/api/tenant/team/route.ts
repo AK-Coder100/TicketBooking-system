@@ -16,11 +16,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'No tenant context found' }, { status: 400 });
     }
 
-    const tId = tenantId || new URL(request.url).searchParams.get('tenantId') || 'ten_sunburn_01';
+    let tId = tenantId || new URL(request.url).searchParams.get('tenantId');
+    if (!tId) {
+      const firstTenant: any = await db.prepare('SELECT id FROM tenants ORDER BY created_at ASC LIMIT 1').get();
+      tId = firstTenant?.id;
+    }
 
-    const tenant: any = db.prepare('SELECT id, name, slug, event_creation_policy FROM tenants WHERE id = ?').get(tId);
+    if (!tId) {
+      return NextResponse.json({ success: false, error: 'No tenant found' }, { status: 404 });
+    }
 
-    const teamMembers: any[] = db.prepare(`
+    const tenant: any = await db.prepare('SELECT id, name, slug, event_creation_policy FROM tenants WHERE id = ?').get(tId);
+
+    const teamMembers: any[] = await db.prepare(`
       SELECT id, name, email, phone, role, tenant_role, can_create_events, created_at
       FROM users
       WHERE tenant_id = ?
@@ -49,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (session.role !== 'SUPER_ADMIN' && session.userId) {
-      const userRow: any = db.prepare('SELECT tenant_role FROM users WHERE id = ?').get(session.userId);
+      const userRow: any = await db.prepare('SELECT tenant_role FROM users WHERE id = ?').get(session.userId);
       if (userRow?.tenant_role === 'STAFF') {
         return NextResponse.json({ success: false, error: 'Permission Denied: Gate Staff profile cannot manage team members or permissions' }, { status: 403 });
       }
@@ -65,7 +73,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Name, email, and password are required' }, { status: 400 });
     }
 
-    const existing: any = db.prepare('SELECT id FROM users WHERE email = ?').get(email.trim());
+    const existing: any = await db.prepare('SELECT id FROM users WHERE email = ?').get(email.trim());
     if (existing) {
       return NextResponse.json({ success: false, error: 'A user with this email already exists' }, { status: 400 });
     }
@@ -77,7 +85,7 @@ export async function POST(request: NextRequest) {
     const canCreate = can_create_events != null ? (can_create_events ? 1 : 0) : (tRole === 'STAFF' ? 0 : 1);
     const now = new Date().toISOString();
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO users (id, tenant_id, role, tenant_role, can_create_events, name, email, password_hash, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(userId, tenantId, role, tRole, canCreate, name.trim(), email.trim(), passwordHash, now);
@@ -96,7 +104,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (session.role !== 'SUPER_ADMIN' && session.userId) {
-      const userRow: any = db.prepare('SELECT tenant_role FROM users WHERE id = ?').get(session.userId);
+      const userRow: any = await db.prepare('SELECT tenant_role FROM users WHERE id = ?').get(session.userId);
       if (userRow?.tenant_role === 'STAFF') {
         return NextResponse.json({ success: false, error: 'Permission Denied: Gate Staff profile cannot manage team members or permissions' }, { status: 403 });
       }
@@ -107,15 +115,15 @@ export async function PATCH(request: NextRequest) {
     const tenantId = session.tenantId || body.tenantId;
 
     if (event_creation_policy && tenantId) {
-      db.prepare(`UPDATE tenants SET event_creation_policy = ? WHERE id = ?`).run(event_creation_policy, tenantId);
+      await db.prepare(`UPDATE tenants SET event_creation_policy = ? WHERE id = ?`).run(event_creation_policy, tenantId);
     }
 
     if (targetUserId) {
       if (tenant_role) {
-        db.prepare(`UPDATE users SET tenant_role = ? WHERE id = ?`).run(tenant_role, targetUserId);
+        await db.prepare(`UPDATE users SET tenant_role = ? WHERE id = ?`).run(tenant_role, targetUserId);
       }
       if (can_create_events != null) {
-        db.prepare(`UPDATE users SET can_create_events = ? WHERE id = ?`).run(can_create_events ? 1 : 0, targetUserId);
+        await db.prepare(`UPDATE users SET can_create_events = ? WHERE id = ?`).run(can_create_events ? 1 : 0, targetUserId);
       }
     }
 

@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     const tierId = `tier_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
     const now = new Date().toISOString();
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO ticket_tiers (id, event_id, name, price_in_paise, capacity, is_unlimited, valid_date, early_bird_deadline, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(

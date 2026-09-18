@@ -1,381 +1,259 @@
-import { DatabaseSync } from 'node:sqlite';
-import path from 'node:path';
-import fs from 'node:fs';
+import pg from 'pg';
 import bcrypt from 'bcryptjs';
 
-import os from 'node:os';
+const { Pool } = pg;
 
-function getDatabaseDirectory(): string {
-  const localDir = path.join(process.cwd(), 'data');
-  try {
-    if (!fs.existsSync(localDir)) {
-      fs.mkdirSync(localDir, { recursive: true });
-    }
-    fs.accessSync(localDir, fs.constants.W_OK);
-    return localDir;
-  } catch (_) {
-    const tmpDir = path.join(os.tmpdir(), 'data');
-    if (!fs.existsSync(tmpDir)) {
-      try {
-        fs.mkdirSync(tmpDir, { recursive: true });
-      } catch (_) {}
-    }
-    return tmpDir;
+const connectionString =
+  process.env.DATABASE_URL ||
+  'postgresql://neondb_owner:npg_y3KUvWs1ewbO@ep-rough-mountain-aob0vjsn-pooler.c-2.ap-southeast-1.aws.neon.tech/event_manage?sslmode=require&channel_binding=require';
+
+export const pool = new Pool({
+  connectionString,
+  ssl: {
+    rejectUnauthorized: false
+  },
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000
+});
+
+/**
+ * Transforms standard SQL with SQLite-style `?` placeholders or syntax
+ * into PostgreSQL parameterized SQL ($1, $2, ...)
+ */
+export function transformSql(sql: string): string {
+  let paramIndex = 1;
+  let transformed = sql.replace(/\?/g, () => `$${paramIndex++}`);
+
+  // Handle common SQLite -> Postgres syntax differences
+  transformed = transformed.replace(/COLLATE\s+NOCASE/gi, '');
+  transformed = transformed.replace(/datetime\('now'\)/gi, 'NOW()');
+  transformed = transformed.replace(/INSERT\s+OR\s+IGNORE\s+INTO/gi, 'INSERT INTO');
+  
+  return transformed;
+}
+
+/**
+ * High-performance, async database abstraction layer for PostgreSQL
+ */
+export const db = {
+  /**
+   * Raw parameterized query on the pool
+   */
+  async query(text: string, params: any[] = []): Promise<pg.QueryResult<any>> {
+    const transformed = transformSql(text);
+    return pool.query(transformed, params);
+  },
+
+  /**
+   * Execute multiple raw DDL / SQL commands
+   */
+  async exec(sql: string): Promise<void> {
+    await pool.query(sql);
+  },
+
+  /**
+   * SQLite-compatible async prepare interface for seamless codebase integration
+   */
+  prepare(sql: string) {
+    return {
+      async get(...params: any[]): Promise<any> {
+        const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
+        const res = await db.query(sql, flatParams);
+        return res.rows[0] || null;
+      },
+      async all(...params: any[]): Promise<any[]> {
+        const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
+        const res = await db.query(sql, flatParams);
+        return res.rows;
+      },
+      async run(...params: any[]): Promise<{ rowCount: number }> {
+        const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
+        const res = await db.query(sql, flatParams);
+        return { rowCount: res.rowCount || 0 };
+      }
+    };
   }
-}
-
-const dbDir = getDatabaseDirectory();
-const dbPath = process.env.DB_PATH || path.join(dbDir, 'ticket_platform.db');
-export const db = new DatabaseSync(dbPath);
-
-try {
-  db.exec('PRAGMA busy_timeout = 10000;');
-  db.exec('PRAGMA journal_mode = WAL;');
-  db.exec('PRAGMA foreign_keys = ON;');
-} catch (err) {
-  // If another process is initializing pragmas, ignore
-}
+};
 
 let initialized = false;
 
-export function initSchema() {
+export async function initSchema(): Promise<void> {
   if (initialized) return;
   try {
+    await db.exec(`
+      -- Tenants table
+      CREATE TABLE IF NOT EXISTS tenants (
+        id VARCHAR(100) PRIMARY KEY,
+        slug VARCHAR(100) UNIQUE NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        gateway_account_id VARCHAR(255),
+        fee_bearer_type VARCHAR(20) DEFAULT 'USER',
+        default_platform_fee INTEGER DEFAULT 200,
+        is_gateway_fee_passed_to_customer INTEGER DEFAULT 1,
+        status VARCHAR(20) DEFAULT 'ACTIVE',
+        contact_email VARCHAR(255),
+        contact_phone VARCHAR(50),
+        event_creation_policy VARCHAR(50) DEFAULT 'ADMIN_ONLY',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
 
-  db.exec(`
-    -- Tenants table
-    CREATE TABLE IF NOT EXISTS tenants (
-      id TEXT PRIMARY KEY,
-      slug TEXT UNIQUE NOT NULL,
-      name TEXT NOT NULL,
-      gateway_account_id TEXT,
-      fee_bearer_type TEXT CHECK(fee_bearer_type IN ('USER', 'ORGANIZER')) DEFAULT 'USER',
-      default_platform_fee INTEGER DEFAULT 200, -- ₹2.00 in paise
-      is_gateway_fee_passed_to_customer INTEGER DEFAULT 1, -- 1 = true, 0 = false
-      status TEXT CHECK(status IN ('ACTIVE', 'SUSPENDED')) DEFAULT 'ACTIVE',
-      contact_email TEXT,
-      contact_phone TEXT,
-      created_at TEXT NOT NULL
-    );
+      -- Users table
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(100) PRIMARY KEY,
+        tenant_id VARCHAR(100) REFERENCES tenants(id) ON DELETE SET NULL,
+        role VARCHAR(50) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        phone VARCHAR(50),
+        password_hash TEXT,
+        tenant_role VARCHAR(50),
+        can_create_events INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
 
-    -- Platform Settings (Master Gateway & Global Rules)
-    CREATE TABLE IF NOT EXISTS platform_settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
+      -- Platform Settings table
+      CREATE TABLE IF NOT EXISTS platform_settings (
+        key VARCHAR(100) PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
 
-    -- Users table (Admins and General Users/Customers)
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      tenant_id TEXT REFERENCES tenants(id) ON DELETE SET NULL,
-      role TEXT CHECK(role IN ('SUPER_ADMIN', 'TENANT_ADMIN', 'CUSTOMER')) NOT NULL,
-      name TEXT NOT NULL,
-      email TEXT,
-      phone TEXT,
-      password_hash TEXT,
-      created_at TEXT NOT NULL
-    );
+      -- Events table
+      CREATE TABLE IF NOT EXISTS events (
+        id VARCHAR(100) PRIMARY KEY,
+        tenant_id VARCHAR(100) NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        title VARCHAR(255) NOT NULL,
+        banner_url TEXT,
+        description TEXT,
+        location TEXT NOT NULL,
+        start_date TIMESTAMPTZ NOT NULL,
+        end_date TIMESTAMPTZ NOT NULL,
+        is_published INTEGER DEFAULT 1,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
 
-    -- Events table
-    CREATE TABLE IF NOT EXISTS events (
-      id TEXT PRIMARY KEY,
-      tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-      title TEXT NOT NULL,
-      banner_url TEXT,
-      description TEXT,
-      location TEXT NOT NULL,
-      start_date TEXT NOT NULL,
-      end_date TEXT NOT NULL,
-      is_published INTEGER DEFAULT 1,
-      created_at TEXT NOT NULL
-    );
+      -- Event Sessions table
+      CREATE TABLE IF NOT EXISTS event_sessions (
+        id VARCHAR(100) PRIMARY KEY,
+        event_id VARCHAR(100) NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        session_date VARCHAR(50) NOT NULL,
+        start_time VARCHAR(20),
+        end_time VARCHAR(20),
+        venue_note TEXT,
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
 
-    -- Event Sessions table (BookMyShow-style: each event has 1+ sessions)
-    -- A "session" is a distinct show slot — e.g. "Day 1 Evening", "Day 2 Headliner Night"
-    -- Single-day events simply have one session.
-    CREATE TABLE IF NOT EXISTS event_sessions (
-      id TEXT PRIMARY KEY,
-      event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-      name TEXT NOT NULL,
-      session_date TEXT NOT NULL,        -- YYYY-MM-DD
-      start_time TEXT,                   -- HH:MM (24h), optional
-      end_time TEXT,                     -- HH:MM (24h), optional
-      venue_note TEXT,                   -- e.g. "Main Stage", "Hall B"
-      sort_order INTEGER DEFAULT 0,
-      created_at TEXT NOT NULL
-    );
+      -- Ticket Tiers table
+      CREATE TABLE IF NOT EXISTS ticket_tiers (
+        id VARCHAR(100) PRIMARY KEY,
+        event_id VARCHAR(100) NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        session_id VARCHAR(100) REFERENCES event_sessions(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        price_in_paise INTEGER NOT NULL,
+        capacity INTEGER,
+        is_unlimited INTEGER DEFAULT 0,
+        valid_date VARCHAR(50),
+        early_bird_deadline VARCHAR(50),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
 
-    -- Ticket Tiers table
-    -- session_id links a tier to a specific session (NULL = legacy / all-day global tier)
-    CREATE TABLE IF NOT EXISTS ticket_tiers (
-      id TEXT PRIMARY KEY,
-      event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-      session_id TEXT REFERENCES event_sessions(id) ON DELETE CASCADE,
-      name TEXT NOT NULL,
-      price_in_paise INTEGER NOT NULL,
-      capacity INTEGER,
-      is_unlimited INTEGER DEFAULT 0,
-      valid_date TEXT,
-      early_bird_deadline TEXT,
-      created_at TEXT NOT NULL
-    );
+      -- Reservations table
+      CREATE TABLE IF NOT EXISTS reservations (
+        id VARCHAR(100) PRIMARY KEY,
+        tier_id VARCHAR(100) NOT NULL REFERENCES ticket_tiers(id) ON DELETE CASCADE,
+        session_token VARCHAR(255) NOT NULL,
+        quantity INTEGER NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
 
-    -- 10-Minute Concurrency Inventory Reservations
-    CREATE TABLE IF NOT EXISTS reservations (
-      id TEXT PRIMARY KEY,
-      tier_id TEXT NOT NULL REFERENCES ticket_tiers(id) ON DELETE CASCADE,
-      session_token TEXT NOT NULL,
-      quantity INTEGER NOT NULL,
-      expires_at TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
+      -- Orders table
+      CREATE TABLE IF NOT EXISTS orders (
+        id VARCHAR(100) PRIMARY KEY,
+        tenant_id VARCHAR(100) NOT NULL REFERENCES tenants(id),
+        user_id VARCHAR(100) REFERENCES users(id),
+        customer_name VARCHAR(255) NOT NULL,
+        customer_phone VARCHAR(50) NOT NULL,
+        customer_email VARCHAR(255),
+        total_base_price INTEGER NOT NULL,
+        platform_fee INTEGER NOT NULL,
+        convenience_fee INTEGER NOT NULL,
+        total_charged INTEGER NOT NULL,
+        payment_status VARCHAR(20) DEFAULT 'PENDING',
+        gateway_order_id VARCHAR(255),
+        gateway_payment_id VARCHAR(255),
+        gateway_type VARCHAR(20) DEFAULT 'CASHFREE',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
 
-    -- Orders table
-    CREATE TABLE IF NOT EXISTS orders (
-      id TEXT PRIMARY KEY,
-      tenant_id TEXT NOT NULL REFERENCES tenants(id),
-      user_id TEXT REFERENCES users(id),
-      customer_name TEXT NOT NULL,
-      customer_phone TEXT NOT NULL,
-      customer_email TEXT,
-      total_base_price INTEGER NOT NULL,
-      platform_fee INTEGER NOT NULL,
-      convenience_fee INTEGER NOT NULL,
-      total_charged INTEGER NOT NULL,
-      payment_status TEXT CHECK(payment_status IN ('PENDING', 'PAID', 'FAILED')) DEFAULT 'PENDING',
-      gateway_order_id TEXT,
-      gateway_payment_id TEXT,
-      gateway_type TEXT CHECK(gateway_type IN ('RAZORPAY', 'CASHFREE')) DEFAULT 'CASHFREE',
-      created_at TEXT NOT NULL
-    );
+      -- Tickets table
+      CREATE TABLE IF NOT EXISTS tickets (
+        id VARCHAR(100) PRIMARY KEY,
+        order_id VARCHAR(100) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        tier_id VARCHAR(100) NOT NULL REFERENCES ticket_tiers(id),
+        attendee_name VARCHAR(255) NOT NULL,
+        attendee_age INTEGER NOT NULL,
+        qr_secret_token TEXT NOT NULL,
+        checked_in_at TIMESTAMPTZ,
+        checkin_count INTEGER DEFAULT 0,
+        is_override_allowed INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
 
-    -- Tickets table
-    CREATE TABLE IF NOT EXISTS tickets (
-      id TEXT PRIMARY KEY,
-      order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-      tier_id TEXT NOT NULL REFERENCES ticket_tiers(id),
-      attendee_name TEXT NOT NULL,
-      attendee_age INTEGER NOT NULL,
-      qr_secret_token TEXT NOT NULL,
-      checked_in_at TEXT,
-      checkin_count INTEGER DEFAULT 0,
-      is_override_allowed INTEGER DEFAULT 0,
-      created_at TEXT NOT NULL
-    );
+      -- Ticket Audit Logs table
+      CREATE TABLE IF NOT EXISTS ticket_audit_logs (
+        id VARCHAR(100) PRIMARY KEY,
+        ticket_id VARCHAR(100) NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+        action_type VARCHAR(50) NOT NULL,
+        metadata TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
 
-    -- Ticket Audit Logs table
-    CREATE TABLE IF NOT EXISTS ticket_audit_logs (
-      id TEXT PRIMARY KEY,
-      ticket_id TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
-      action_type TEXT CHECK(action_type IN ('WHATSAPP_SENT', 'DOWNLOADED', 'SCAN_ATTEMPT', 'OVERRIDE_CHECKIN')) NOT NULL,
-      metadata TEXT,
-      created_at TEXT NOT NULL
-    );
-  `);
-
-  // Migrate: add session_id column to ticket_tiers if it doesn't exist yet
-  try {
-    db.exec(`ALTER TABLE ticket_tiers ADD COLUMN session_id TEXT REFERENCES event_sessions(id) ON DELETE CASCADE`);
-  } catch (_) { /* column already exists */ }
-
-  try {
-    db.exec(`ALTER TABLE users ADD COLUMN tenant_role TEXT CHECK(tenant_role IN ('OWNER', 'EVENT_MANAGER', 'STAFF')) DEFAULT 'OWNER'`);
-  } catch (_) {}
-
-  try {
-    db.exec(`ALTER TABLE users ADD COLUMN can_create_events INTEGER DEFAULT 1`);
-  } catch (_) {}
-
-  try {
-    db.exec(`ALTER TABLE tenants ADD COLUMN event_creation_policy TEXT CHECK(event_creation_policy IN ('ADMIN_ONLY', 'ALL_MEMBERS')) DEFAULT 'ADMIN_ONLY'`);
-  } catch (_) {}
-
-    seedData();
+    await seedData();
     initialized = true;
-  } catch (e) {
-    initialized = true;
+  } catch (err: any) {
+    console.error('PostgreSQL schema initialization error:', err);
   }
 }
 
-function seedData() {
-  const check = (db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'SUPER_ADMIN'").get() as any)?.count;
-  const now = new Date().toISOString();
+export async function seedData(): Promise<void> {
+  try {
+    const checkRes = await db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'SUPER_ADMIN'").get();
+    const check = parseInt(checkRes?.count || '0', 10);
+    const now = new Date().toISOString();
 
-  const superAdminEmail = process.env.INITIAL_SUPER_ADMIN_EMAIL || 'admin@platform.com';
-  const superAdminPass = process.env.INITIAL_SUPER_ADMIN_PASSWORD || 'admin123';
-  const superAdminHash = bcrypt.hashSync(superAdminPass, 10);
+    const superAdminEmail = (process.env.INITIAL_SUPER_ADMIN_EMAIL || 'sup_admin@neoclare.com').toLowerCase().trim();
+    const superAdminPass = process.env.INITIAL_SUPER_ADMIN_PASSWORD || 'lkyhfrd@123';
+    const superAdminHash = bcrypt.hashSync(superAdminPass, 10);
 
-  if (!check || check === 0) {
-    db.prepare(`
-      INSERT INTO users (id, tenant_id, role, name, email, phone, password_hash, created_at)
-      VALUES ('usr_superadmin', NULL, 'SUPER_ADMIN', 'Executive Super Admin', ?, '+919876543210', ?, ?)
-    `).run(superAdminEmail, superAdminHash, now);
+    if (check === 0) {
+      await db.prepare(`
+        INSERT INTO users (id, tenant_id, role, name, email, phone, password_hash, created_at)
+        VALUES ('usr_superadmin', NULL, 'SUPER_ADMIN', 'Super Admin', ?, '+919918327131', ?, ?)
+        ON CONFLICT (email) DO NOTHING
+      `).run(superAdminEmail, superAdminHash, now);
+      console.log(`[Database] Initial Super Admin created: ${superAdminEmail}`);
+    }
+
+    // Default Platform Settings
+    await db.exec(`
+      INSERT INTO platform_settings (key, value, updated_at) VALUES 
+      ('active_gateway', 'CASHFREE', NOW()),
+      ('default_commission_paise', '200', NOW()),
+      ('fixed_gateway_fee_paise', '100', NOW()),
+      ('gateway_surcharge_percent', '3.0', NOW()),
+      ('gst_on_fee_percent', '0', NOW())
+      ON CONFLICT (key) DO NOTHING;
+    `);
+
+  } catch (err: any) {
+    console.error('PostgreSQL seedData error:', err);
   }
-
-  // Platform Settings (Default: 3% Surcharge + ₹1 Gateway Fee + ₹2 Platform Fee = Convenience Fee)
-  db.prepare(`
-    INSERT OR IGNORE INTO platform_settings (key, value, updated_at) VALUES 
-    ('active_gateway', 'CASHFREE', ?),
-    ('default_commission_paise', '200', ?),
-    ('fixed_gateway_fee_paise', '100', ?),
-    ('gateway_surcharge_percent', '3.0', ?),
-    ('gst_on_fee_percent', '0', ?)
-  `).run(now, now, now, now, now);
-
-  db.prepare(`INSERT OR REPLACE INTO platform_settings (key, value, updated_at) VALUES ('gateway_surcharge_percent', '3.0', ?)`).run(now);
-  db.prepare(`INSERT OR REPLACE INTO platform_settings (key, value, updated_at) VALUES ('fixed_gateway_fee_paise', '100', ?)`).run(now);
-  db.prepare(`INSERT OR REPLACE INTO platform_settings (key, value, updated_at) VALUES ('default_commission_paise', '200', ?)`).run(now);
-
-  const organizerHash = bcrypt.hashSync('organizer123', 10);
-  const shouldSeedDemo = process.env.SEED_DEMO_DATA === 'true';
-  if (!shouldSeedDemo) return;
-
-    // 2. Tenants
-    const tenants = [
-      {
-        id: 'ten_sunburn_01',
-        slug: 'sunburn',
-        name: 'Sunburn Music Festival',
-        gateway_account_id: 'acc_rzp_route_sunburn_78',
-        fee_bearer_type: 'USER',
-        default_platform_fee: 200,
-        is_gateway_fee_passed_to_customer: 1,
-        status: 'ACTIVE',
-        contact_email: 'ops@sunburn.in',
-        contact_phone: '+919988776655'
-      },
-      {
-        id: 'ten_techconf_02',
-        slug: 'techconf',
-        name: 'Global AI & Tech Summit',
-        gateway_account_id: 'acc_cf_split_tech_34',
-        fee_bearer_type: 'ORGANIZER',
-        default_platform_fee: 200,
-        is_gateway_fee_passed_to_customer: 0,
-        status: 'ACTIVE',
-        contact_email: 'hello@techconf.global',
-        contact_phone: '+919123456780'
-      },
-      {
-        id: 'ten_comedy_03',
-        slug: 'laughclub',
-        name: 'The Indian Laugh Club',
-        gateway_account_id: 'acc_rzp_route_laugh_12',
-        fee_bearer_type: 'USER',
-        default_platform_fee: 300,
-        is_gateway_fee_passed_to_customer: 1,
-        status: 'ACTIVE',
-        contact_email: 'tickets@laughclub.in',
-        contact_phone: '+919811223344'
-      }
-    ];
-
-    for (const t of tenants) {
-      db.prepare(`
-        INSERT OR IGNORE INTO tenants (id, slug, name, gateway_account_id, fee_bearer_type, default_platform_fee, is_gateway_fee_passed_to_customer, status, contact_email, contact_phone, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(t.id, t.slug, t.name, t.gateway_account_id, t.fee_bearer_type, t.default_platform_fee, t.is_gateway_fee_passed_to_customer, t.status, t.contact_email, t.contact_phone, now);
-    }
-
-    // Tenant Admins with bcrypt password "organizer123"
-    db.prepare(`
-      INSERT OR IGNORE INTO users (id, tenant_id, role, name, email, phone, password_hash, created_at)
-      VALUES 
-      ('usr_sunburn_admin', 'ten_sunburn_01', 'TENANT_ADMIN', 'Rohan Verma', 'rohan@sunburn.in', '+919988776655', ?, ?),
-      ('usr_techconf_admin', 'ten_techconf_02', 'TENANT_ADMIN', 'Priya Sharma', 'priya@techconf.global', '+919123456780', ?, ?),
-      ('usr_laugh_admin', 'ten_comedy_03', 'TENANT_ADMIN', 'Karan Mehta', 'karan@laughclub.in', '+919811223344', ?, ?)
-    `).run(organizerHash, now, organizerHash, now, organizerHash, now);
-
-    // Seed Events
-    const events = [
-      {
-        id: 'evt_sunburn_2026',
-        tenant_id: 'ten_sunburn_01',
-        title: 'Sunburn Arena 2026 - Electronic Odyssey',
-        banner_url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&q=80',
-        description: 'The premier electronic music festival featuring international superstar DJs, laser displays, and high-energy crowd vibes.',
-        location: 'Vagator Beach Arena, North Goa',
-        start_date: '2026-12-28T16:00:00Z',
-        end_date: '2026-12-31T23:59:00Z'
-      },
-      {
-        id: 'evt_techconf_2026',
-        tenant_id: 'ten_techconf_02',
-        title: 'Global AI Architecture & Cloud Conclave',
-        banner_url: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&q=80',
-        description: 'A 2-day deep dive into autonomous AI agents, distributed systems, multimodal intelligence, and multi-tenant engineering.',
-        location: 'Bengaluru International Exhibition Centre (BIEC)',
-        start_date: '2026-11-14T09:00:00Z',
-        end_date: '2026-11-15T18:00:00Z'
-      },
-      {
-        id: 'evt_comedy_night',
-        tenant_id: 'ten_comedy_03',
-        title: 'Unfiltered Comedy Live Special with Top Headliners',
-        banner_url: 'https://images.unsplash.com/photo-1514306191717-452ec28c7814?w=1200&q=80',
-        description: 'An evening of rip-roaring standup comedy, crowd work, and hilarious anecdotes featuring top comedians in an intimate acoustic club setting.',
-        location: 'The Cuckoo Club, Bandra West, Mumbai',
-        start_date: '2026-10-20T19:30:00Z',
-        end_date: '2026-10-20T22:00:00Z'
-      }
-    ];
-
-    for (const e of events) {
-      db.prepare(`
-        INSERT OR IGNORE INTO events (id, tenant_id, title, banner_url, description, location, start_date, end_date, is_published, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
-      `).run(e.id, e.tenant_id, e.title, e.banner_url, e.description, e.location, e.start_date, e.end_date, now);
-    }
-
-    // Seed Sessions for each event
-    const sessions = [
-      // Sunburn — 4 sessions
-      { id: 'sess_sb_d1', event_id: 'evt_sunburn_2026', name: 'Day 1 — Warm-Up Night', session_date: '2026-12-28', start_time: '16:00', end_time: '23:59', venue_note: 'Main Stage', sort_order: 1 },
-      { id: 'sess_sb_d2', event_id: 'evt_sunburn_2026', name: 'Day 2 — Progressive House', session_date: '2026-12-29', start_time: '16:00', end_time: '23:59', venue_note: 'Main Stage', sort_order: 2 },
-      { id: 'sess_sb_d3', event_id: 'evt_sunburn_2026', name: 'Day 3 — Tech Trance Night', session_date: '2026-12-30', start_time: '16:00', end_time: '23:59', venue_note: 'Main Stage', sort_order: 3 },
-      { id: 'sess_sb_d4', event_id: 'evt_sunburn_2026', name: 'Day 4 — Grand Finale', session_date: '2026-12-31', start_time: '16:00', end_time: '23:59', venue_note: 'Main Stage', sort_order: 4 },
-      // TechConf — 2 sessions
-      { id: 'sess_tc_d1', event_id: 'evt_techconf_2026', name: 'Day 1 — AI & Agents', session_date: '2026-11-14', start_time: '09:00', end_time: '18:00', venue_note: 'Hall A', sort_order: 1 },
-      { id: 'sess_tc_d2', event_id: 'evt_techconf_2026', name: 'Day 2 — Cloud & Systems', session_date: '2026-11-15', start_time: '09:00', end_time: '18:00', venue_note: 'Hall A', sort_order: 2 },
-      // Comedy — 1 session
-      { id: 'sess_com_01', event_id: 'evt_comedy_night', name: 'Comedy Night Live', session_date: '2026-10-20', start_time: '19:30', end_time: '22:00', venue_note: 'Main Stage', sort_order: 1 },
-    ];
-
-    for (const s of sessions) {
-      db.prepare(`
-        INSERT OR IGNORE INTO event_sessions (id, event_id, name, session_date, start_time, end_time, venue_note, sort_order, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(s.id, s.event_id, s.name, s.session_date, s.start_time, s.end_time, s.venue_note, s.sort_order, now);
-    }
-
-    // Seed Tiers (with session_id linkage)
-    const tiers = [
-      // Sunburn per-session tiers
-      { id: 'tier_sb_ga_d1',  event_id: 'evt_sunburn_2026', session_id: 'sess_sb_d1', name: 'General Access',    price: 149900, cap: 500, unl: 0, date: '2026-12-28' },
-      { id: 'tier_sb_vip_d1', event_id: 'evt_sunburn_2026', session_id: 'sess_sb_d1', name: 'VIP Lounge Pass',   price: 349900, cap: 100, unl: 0, date: '2026-12-28' },
-      { id: 'tier_sb_ga_d2',  event_id: 'evt_sunburn_2026', session_id: 'sess_sb_d2', name: 'General Access',    price: 199900, cap: 500, unl: 0, date: '2026-12-29' },
-      { id: 'tier_sb_vip_d2', event_id: 'evt_sunburn_2026', session_id: 'sess_sb_d2', name: 'VIP Lounge Pass',   price: 399900, cap: 100, unl: 0, date: '2026-12-29' },
-      { id: 'tier_sb_ga_d3',  event_id: 'evt_sunburn_2026', session_id: 'sess_sb_d3', name: 'General Access',    price: 249900, cap: 400, unl: 0, date: '2026-12-30' },
-      { id: 'tier_sb_vip_d3', event_id: 'evt_sunburn_2026', session_id: 'sess_sb_d3', name: 'VIP Lounge Pass',   price: 449900, cap:  80, unl: 0, date: '2026-12-30' },
-      { id: 'tier_sb_ga_d4',  event_id: 'evt_sunburn_2026', session_id: 'sess_sb_d4', name: 'General Access',    price: 299900, cap: 400, unl: 0, date: '2026-12-31' },
-      { id: 'tier_sb_vip_d4', event_id: 'evt_sunburn_2026', session_id: 'sess_sb_d4', name: 'VIP Ultra Pass',    price: 499900, cap: 100, unl: 0, date: '2026-12-31' },
-      // TechConf per-session
-      { id: 'tier_tc_d1_std', event_id: 'evt_techconf_2026', session_id: 'sess_tc_d1', name: 'Delegate Pass',    price: 199900, cap: 400, unl: 0, date: '2026-11-14' },
-      { id: 'tier_tc_d1_vip', event_id: 'evt_techconf_2026', session_id: 'sess_tc_d1', name: 'Workshop + Delegate', price: 349900, cap: 80, unl: 0, date: '2026-11-14' },
-      { id: 'tier_tc_d2_std', event_id: 'evt_techconf_2026', session_id: 'sess_tc_d2', name: 'Delegate Pass',    price: 199900, cap: 400, unl: 0, date: '2026-11-15' },
-      { id: 'tier_tc_d2_vip', event_id: 'evt_techconf_2026', session_id: 'sess_tc_d2', name: 'Workshop + Delegate', price: 349900, cap: 80, unl: 0, date: '2026-11-15' },
-      // Comedy single session
-      { id: 'tier_com_gen',   event_id: 'evt_comedy_night', session_id: 'sess_com_01', name: 'General Seating',  price:  49900, cap: 120, unl: 0, date: '2026-10-20' },
-      { id: 'tier_com_prem',  event_id: 'evt_comedy_night', session_id: 'sess_com_01', name: 'Premium Front Row', price:  99900, cap:  30, unl: 0, date: '2026-10-20' },
-    ];
-
-    for (const tr of tiers) {
-      db.prepare(`
-        INSERT OR IGNORE INTO ticket_tiers (id, event_id, session_id, name, price_in_paise, capacity, is_unlimited, valid_date, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(tr.id, tr.event_id, tr.session_id, tr.name, tr.price, tr.cap, tr.unl, tr.date, now);
-    }
 }
 
-initSchema();
+// Auto-run schema check in background
+initSchema().catch(err => console.error('initSchema error on startup:', err));

@@ -381,6 +381,37 @@ export default function TenantCheckoutPage() {
   return (
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '12px 10px' }}>
 
+      {/* Top Return to Home Navigation Bar */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+        padding: '8px 14px',
+        background: 'rgba(30, 41, 59, 0.6)',
+        borderRadius: 10,
+        border: '1px solid var(--border-glass)'
+      }}>
+        <Link
+          href="/"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            color: '#818cf8',
+            textDecoration: 'none',
+            fontSize: '0.85rem',
+            fontWeight: 700
+          }}
+        >
+          <span>🏠</span>
+          <span>← Back to Home</span>
+        </Link>
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+          {tenant?.name || 'Secure Checkout'}
+        </span>
+      </div>
+
       {/* STEP 1: SELECT EVENT, DATE, MULTI-TIER QUANTITY */}
       {step === 'select' && (
         <div className="glass-panel" style={{ padding: '16px 14px', borderRadius: 14 }}>
@@ -390,7 +421,7 @@ export default function TenantCheckoutPage() {
               {tenant?.name || 'Box Office'}
             </span>
             <Link href="/" style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textDecoration: 'none', whiteSpace: 'nowrap' }}>
-              ← All Events
+              Home
             </Link>
           </div>
 

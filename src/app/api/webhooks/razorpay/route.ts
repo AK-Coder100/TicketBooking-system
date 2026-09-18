@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       const orderId = paymentEntity?.notes?.order_id || paymentEntity?.order_id;
 
       if (orderId) {
-        db.prepare('UPDATE orders SET payment_status = "PAID", gateway_payment_id = ? WHERE id = ?')
+        await db.prepare('UPDATE orders SET payment_status = \'PAID\', gateway_payment_id = ? WHERE id = ?')
           .run(paymentEntity.id, orderId);
       }
     }

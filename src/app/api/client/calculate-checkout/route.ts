@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     if (itemList.length === 0) return NextResponse.json({ success: false, error: 'No items specified' }, { status: 400 });
 
     const primaryTierId = itemList[0].tierId;
-    const primaryTier: any = db.prepare(`
+    const primaryTier: any = await db.prepare(`
       SELECT tt.*, e.tenant_id, t.default_platform_fee, t.is_gateway_fee_passed_to_customer, t.gateway_account_id
       FROM ticket_tiers tt
       JOIN events e ON tt.event_id = e.id
@@ -31,13 +31,13 @@ export async function POST(request: NextRequest) {
     let totalCount = 0;
 
     for (const item of itemList) {
-      const t: any = db.prepare('SELECT price_in_paise FROM ticket_tiers WHERE id = ?').get(item.tierId);
+      const t: any = await db.prepare('SELECT price_in_paise FROM ticket_tiers WHERE id = ?').get(item.tierId);
       const price = t ? t.price_in_paise : primaryTier.price_in_paise;
       basePricePaise += price * item.quantity;
       totalCount += item.quantity;
     }
 
-    const settingRows: any[] = db.prepare('SELECT key, value FROM platform_settings').all();
+    const settingRows: any[] = await db.prepare('SELECT key, value FROM platform_settings').all();
     const platformSettings: Record<string, string> = {};
     for (const r of settingRows) platformSettings[r.key] = r.value;
 

@@ -7,14 +7,14 @@ interface Props {
 
 export default async function TenantLandingPage({ params }: Props) {
   const { tenant_slug } = await params;
-  initSchema();
+  await initSchema();
   
   let tenant: any = null;
   let events: any[] = [];
   try {
-    tenant = db.prepare(`SELECT id, name, slug, status, contact_email, contact_phone FROM tenants WHERE slug = ? AND status = 'ACTIVE'`).get(tenant_slug);
+    tenant = await db.prepare(`SELECT id, name, slug, status, contact_email, contact_phone FROM tenants WHERE slug = ? AND status = 'ACTIVE'`).get(tenant_slug);
     if (tenant) {
-      events = db.prepare(`SELECT * FROM events WHERE tenant_id = ? AND is_published = 1 ORDER BY start_date ASC`).all(tenant.id);
+      events = await db.prepare(`SELECT * FROM events WHERE tenant_id = ? AND is_published = 1 ORDER BY start_date ASC`).all(tenant.id);
     }
   } catch (e) {
     console.error(e);

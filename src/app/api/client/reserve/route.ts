@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'tierId, sessionToken, and quantity are required' }, { status: 400 });
     }
 
-    const result = createReservation({
+    const result = await createReservation({
       tierId,
       sessionToken,
       quantity: parseInt(quantity, 10)
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'sessionToken and tierId required' }, { status: 400 });
     }
 
-    const reservation = getActiveReservation(sessionToken, tierId);
+    const reservation = await getActiveReservation(sessionToken, tierId);
     return NextResponse.json({
       success: true,
       hasReservation: Boolean(reservation),
