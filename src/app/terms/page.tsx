@@ -90,11 +90,38 @@ export default function TermsAndConditionsPage() {
           <p>
             The platform acts solely as an intermediary technology aggregator for ticket booking and payment split settlement. The respective <b>Event Organizer</b> is solely responsible for event execution, venue security, artist lineups, and performance schedules.
           </p>
+          <ul style={{ paddingLeft: 20, marginTop: 8 }}>
+            <li>Event quality, artist lineup changes, or performance cancellations are entirely the organizer&apos;s responsibility.</li>
+            <li>Venue safety, crowd management, and operational decisions on event day rest with the organizer.</li>
+            <li>Misleading event descriptions or inaccurate event details published by the organizer are not the liability of the platform.</li>
+            <li>Any injuries, damages, or losses suffered at the venue are solely the organizer&apos;s liability.</li>
+          </ul>
+          <p style={{ marginTop: 12, background: 'rgba(251, 146, 60, 0.08)', border: '1px solid rgba(251, 146, 60, 0.25)', padding: 12, borderRadius: 8 }}>
+            <b style={{ color: '#fb923c' }}>⚠️ Dispute Disclaimer:</b> For any event-related disputes, complaints, or claims, the <b>Event Organizer is solely responsible</b>. TicketBooking Platform bears no liability for organizer actions, omissions, or event execution failures. All event disputes must be raised directly with the respective Event Organizer.
+          </p>
         </section>
 
         <section>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff', marginBottom: 8 }}>
-            6. Payment Security & Payment Gateways
+            6. Cancellation &amp; Refund Support
+          </h2>
+          <p>
+            TicketBooking Platform supports cancellations and refunds for eligible transactions. Our refund policy is as follows:
+          </p>
+          <ul style={{ paddingLeft: 20, marginTop: 8 }}>
+            <li>Refunds are supported for event cancellations initiated by the Event Organizer — a <b>100% refund</b> of the ticket base price is credited to the original payment mode.</li>
+            <li>Voluntary customer cancellations are subject to the refund window set by the Event Organizer on the event page.</li>
+            <li>Failed or double-deducted transactions are automatically reconciled and refunded within <b>5–7 business days</b>.</li>
+            <li>All refunds are processed in <b>INR (₹)</b> back to the original payment instrument.</li>
+          </ul>
+          <p style={{ marginTop: 8 }}>
+            For complete details, refer to our <a href="/refunds" style={{ color: '#818cf8' }}>Refunds &amp; Cancellations Policy</a> page.
+          </p>
+        </section>
+
+        <section>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff', marginBottom: 8 }}>
+            7. Payment Security &amp; Payment Gateways
           </h2>
           <p>
             All online transactions are securely encrypted and processed through RBI-authorized payment gateways including Cashfree Payments and Razorpay. We do not store raw credit card numbers or UPI PINs on our servers.
@@ -103,19 +130,19 @@ export default function TermsAndConditionsPage() {
 
         <section>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff', marginBottom: 8 }}>
-            7. Governing Law & Jurisdiction
+            8. Governing Law &amp; Jurisdiction
           </h2>
           <p>
-            These Terms & Conditions are governed by the laws of India. Any legal proceedings or disputes arising from the use of this platform shall be subject to the exclusive jurisdiction of courts located in Bengaluru, Karnataka, India.
+            These Terms &amp; Conditions are governed by the laws of India. Any legal proceedings or disputes arising from the use of this platform shall be subject to the exclusive jurisdiction of courts located in Bengaluru, Karnataka, India.
           </p>
         </section>
 
         <section>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff', marginBottom: 8 }}>
-            8. Contact Details
+            9. Contact Details
           </h2>
           <p>
-            For questions regarding these Terms & Conditions, please contact us at:
+            For questions regarding these Terms &amp; Conditions, please contact us at:
             <br />
             📧 <b>Email:</b> support@platform.com | 📞 <b>Phone:</b> +91 98765 43210
           </p>
