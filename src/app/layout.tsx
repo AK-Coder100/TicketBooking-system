@@ -1,9 +1,10 @@
 import './globals.css';
 import type { Metadata } from 'next';
+import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'Multi-Tenant Ticket Booking Platform',
-  description: 'Production-ready multi-tenant ticket booking platform with Cashfree & Razorpay Route split settlement and signed QR verification.',
+  title: 'TicketBooking Platform - Live Festival & Event Passes',
+  description: 'Multi-tenant live event ticketing platform with Cashfree & Razorpay payments and INR pricing.',
 };
 
 export default function RootLayout({
@@ -13,8 +14,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body suppressHydrationWarning>
-        {children}
+      <body suppressHydrationWarning style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1 }}>
+          {children}
+        </div>
+        <Footer />
       </body>
     </html>
   );
