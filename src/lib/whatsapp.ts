@@ -123,7 +123,7 @@ export async function sendWhatsAppTicketMessage({
         ];
       }
 
-      const metaRes = await fetch(`https://graph.facebook.com/v22.0/${phoneNumberId}/messages`, {
+      let metaRes = await fetch(`https://graph.facebook.com/v22.0/${phoneNumberId}/messages`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -132,7 +132,34 @@ export async function sendWhatsAppTicketMessage({
         body: JSON.stringify(payload)
       });
 
-      const metaJson = await metaRes.json();
+      let metaJson = await metaRes.json();
+
+      // If template is still PENDING Meta approval (Error #132001), fallback to hello_world
+      if (!metaRes.ok && metaJson.error?.code === 132001 && templateName !== 'hello_world') {
+        console.warn(`Template "${templateName}" is currently PENDING Meta approval. Falling back to "hello_world" template...`);
+        const fallbackPayload = {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: recipientPhone,
+          type: 'template',
+          template: {
+            name: 'hello_world',
+            language: { code: 'en_US' }
+          }
+        };
+
+        metaRes = await fetch(`https://graph.facebook.com/v22.0/${phoneNumberId}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(fallbackPayload)
+        });
+
+        metaJson = await metaRes.json();
+      }
+
       if (metaRes.ok && metaJson.messages?.[0]?.id) {
         dispatchStatus = 'DELIVERED';
       } else {
