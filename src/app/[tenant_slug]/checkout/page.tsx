@@ -744,7 +744,16 @@ export default function TenantCheckoutPage() {
                     Age: <b>{t.attendee_age}</b> &nbsp;•&nbsp; ID: <code>{t.id}</code>
                   </div>
 
-                  <div style={{ marginTop: 10 }}>
+                  <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <a
+                      href={`/api/client/tickets/${t.id}/png`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-primary btn-sm"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none', padding: '5px 10px', fontSize: '0.78rem' }}
+                    >
+                      <span>🖼️</span> View PNG Pass
+                    </a>
                     <a
                       href={`/api/client/tickets/${t.id}/pdf`}
                       target="_blank"

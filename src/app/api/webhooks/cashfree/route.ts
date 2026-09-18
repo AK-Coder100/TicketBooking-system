@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { generateTicketToken } from '@/lib/crypto';
+import { sendWhatsAppTicketMessage } from '@/lib/whatsapp';
 import crypto from 'node:crypto';
 
 export async function POST(request: NextRequest) {
@@ -64,6 +65,10 @@ export async function POST(request: NextRequest) {
             INSERT INTO tickets (id, order_id, tier_id, attendee_name, attendee_age, qr_secret_token, checked_in_at, checkin_count, is_override_allowed, created_at)
             VALUES (?, ?, ?, ?, 25, ?, NULL, 0, 0, ?)
           `).run(ticketId, orderId, primaryTier.id, order.customer_name, token, now);
+
+          sendWhatsAppTicketMessage({ ticketId, toPhone: order.customer_phone }).catch(err => {
+            console.warn(`WhatsApp dispatch error from webhook for ticket ${ticketId}:`, err);
+          });
         }
       }
     }

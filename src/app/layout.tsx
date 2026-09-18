@@ -1,10 +1,11 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import Footer from '@/components/Footer';
+import { SITE_CONFIG } from '@/lib/constants';
 
 export const metadata: Metadata = {
-  title: 'TicketBooking Platform - Live Festival & Event Passes',
-  description: 'Multi-tenant live event ticketing platform with Cashfree & Razorpay payments and INR pricing.',
+  title: SITE_CONFIG.title,
+  description: SITE_CONFIG.description,
 };
 
 export default function RootLayout({

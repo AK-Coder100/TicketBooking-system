@@ -194,10 +194,13 @@ export default function GeneralUserWalletPage() {
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--border-glass)' }}>
                     <code style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{t.id}</code>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       <button onClick={() => handleSendWhatsApp(t.id)} className="btn btn-primary btn-sm">
                         💬 Send to WhatsApp
                       </button>
+                      <a href={`/api/client/tickets/${t.id}/png`} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+                        🖼️ View PNG
+                      </a>
                       <a href={`/api/client/tickets/${t.id}/pdf`} className="btn btn-secondary btn-sm">
                         📄 Download PDF
                       </a>
