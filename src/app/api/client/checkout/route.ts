@@ -49,6 +49,12 @@ export async function POST(request: NextRequest) {
           }));
 
     const count = attendeeList.length;
+    if (count > 10) {
+      return NextResponse.json({
+        success: false,
+        error: 'Maximum 10 tickets allowed per booking.'
+      }, { status: 400 });
+    }
 
     // Fetch primary tier for tenant/event context
     const primaryTier: any = await db.prepare(`

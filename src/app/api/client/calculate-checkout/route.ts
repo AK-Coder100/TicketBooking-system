@@ -37,6 +37,10 @@ export async function POST(request: NextRequest) {
       totalCount += item.quantity;
     }
 
+    if (totalCount > 10) {
+      return NextResponse.json({ success: false, error: 'Maximum 10 tickets allowed per booking' }, { status: 400 });
+    }
+
     const settingRows: any[] = await db.prepare('SELECT key, value FROM platform_settings').all();
     const platformSettings: Record<string, string> = {};
     for (const r of settingRows) platformSettings[r.key] = r.value;

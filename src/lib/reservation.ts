@@ -2,6 +2,7 @@ import { db } from './db';
 import crypto from 'node:crypto';
 
 export const HOLD_DURATION_MINUTES = 10;
+export const MAX_CART_LIMIT = 10;
 
 export async function cleanupExpiredReservations() {
   const nowIso = new Date().toISOString();
@@ -56,6 +57,7 @@ export async function getTierCapacity(tierId: string) {
 
 export async function createReservation({ tierId, sessionToken, quantity }: { tierId: string; sessionToken: string; quantity: number }) {
   if (!quantity || quantity < 1) throw new Error('Quantity must be at least 1');
+  if (quantity > MAX_CART_LIMIT) throw new Error(`Maximum ${MAX_CART_LIMIT} tickets allowed per reservation`);
 
   try {
     const tier: any = await db.prepare(`SELECT * FROM ticket_tiers WHERE id = ?`).get(tierId);

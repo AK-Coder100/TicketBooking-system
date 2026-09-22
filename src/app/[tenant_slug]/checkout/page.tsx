@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import QRCode from 'qrcode';
+import { MAX_CART_LIMIT } from '@/lib/constants';
 
 interface Attendee {
   id: string;
@@ -166,12 +167,21 @@ export default function TenantCheckoutPage() {
   const tiersToDisplay = filteredTiers.length > 0 ? filteredTiers : (selectedEvent?.tiers || []);
   const sortedFilteredTiers = [...tiersToDisplay].sort((a, b) => a.price_in_paise - b.price_in_paise);
 
-  // Multi-tier quantity update handler
+  // Multi-tier quantity update handler with max cart limit
   const updateTierQty = (tierId: string, qty: number) => {
     setErrorMsg(null);
+    const sanitizedQty = Math.max(0, qty);
+    const currentQty = tierQuantities[tierId] || 0;
+    const diff = sanitizedQty - currentQty;
+
+    if (diff > 0 && totalTicketCount + diff > MAX_CART_LIMIT) {
+      setErrorMsg(`Cart limit reached: Maximum ${MAX_CART_LIMIT} tickets allowed per booking.`);
+      return;
+    }
+
     setTierQuantities(prev => ({
       ...prev,
-      [tierId]: Math.max(0, qty)
+      [tierId]: sanitizedQty
     }));
   };
 
@@ -190,6 +200,10 @@ export default function TenantCheckoutPage() {
     setErrorMsg(null);
     if (totalTicketCount === 0) {
       setErrorMsg('Select at least 1 ticket to proceed.');
+      return;
+    }
+    if (totalTicketCount > MAX_CART_LIMIT) {
+      setErrorMsg(`Cart limit exceeded: Maximum ${MAX_CART_LIMIT} tickets allowed per booking.`);
       return;
     }
 
@@ -493,9 +507,14 @@ export default function TenantCheckoutPage() {
 
           {/* 2. Multi-Tier Ticket Quantity Cards */}
           <div style={{ fontWeight: 700, fontSize: '0.88rem', marginBottom: 8, color: '#e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Select Tickets & Quantity</span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', fontWeight: 500, whiteSpace: 'nowrap' }}>
-              {sortedFilteredTiers.length} available
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>Select Tickets & Quantity</span>
+              <span style={{ fontSize: '0.7rem', background: 'rgba(99, 102, 241, 0.18)', color: '#a5b4fc', padding: '2px 8px', borderRadius: 12, border: '1px solid rgba(99, 102, 241, 0.35)', fontWeight: 600 }}>
+                Max {MAX_CART_LIMIT} per order
+              </span>
+            </div>
+            <span style={{ fontSize: '0.75rem', color: totalTicketCount >= MAX_CART_LIMIT ? '#fbbf24' : 'var(--text-dim)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+              {totalTicketCount}/{MAX_CART_LIMIT} selected
             </span>
           </div>
 
@@ -503,6 +522,7 @@ export default function TenantCheckoutPage() {
             {sortedFilteredTiers.map((t: any) => {
               const qty = tierQuantities[t.id] || 0;
               const isSelected = qty > 0;
+              const isAtLimit = totalTicketCount >= MAX_CART_LIMIT;
               return (
                 <div
                   key={t.id}
@@ -538,6 +558,7 @@ export default function TenantCheckoutPage() {
                       className="btn btn-secondary btn-sm"
                       style={{ width: 32, height: 32, padding: 0, fontSize: '1rem', flexShrink: 0 }}
                       onClick={() => updateTierQty(t.id, qty - 1)}
+                      disabled={qty <= 0}
                     >
                       -
                     </button>
@@ -547,8 +568,18 @@ export default function TenantCheckoutPage() {
                     <button
                       type="button"
                       className="btn btn-primary btn-sm"
-                      style={{ width: 32, height: 32, padding: 0, fontSize: '1rem', flexShrink: 0 }}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        padding: 0,
+                        fontSize: '1rem',
+                        flexShrink: 0,
+                        opacity: isAtLimit ? 0.45 : 1,
+                        cursor: isAtLimit ? 'not-allowed' : 'pointer'
+                      }}
                       onClick={() => updateTierQty(t.id, qty + 1)}
+                      disabled={isAtLimit}
+                      title={isAtLimit ? `Max ${MAX_CART_LIMIT} tickets limit reached` : 'Add ticket'}
                     >
                       +
                     </button>

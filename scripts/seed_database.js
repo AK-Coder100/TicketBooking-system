@@ -70,7 +70,7 @@ async function setupDatabase() {
     const eventId = 'evt_dandiya_2026';
     const eventTitle = 'परंपरागत डांडिया महोत्सव 2026 - DANDIYA NIGHT';
     const eventDesc = 'अन्नपूर्णा सेवा समिति Presents परंपरागत डांडिया महोत्सव 2026 (Dandiya Night). Event Organized by RB Garment Enterprises & Managed by SR Production. Live DJ, Dhol, Food Stall, Shopping Stall, Special Performance & Selfie Zone. आइए, परंपरा के रंग में रंगें, संस्कृति के संग नाचें... Contact: 7054488454, 8858152101, 9918327131, 7607137577';
-    const eventLocation = 'KACHERI Club, Town Hall, Gorakhpur, 273008';
+    const eventLocation = 'KACHERI Club, Town Hall, Gorakhpur, 273001';
     const bannerUrl = '/dandiya-poster.png';
 
     await client.query(`

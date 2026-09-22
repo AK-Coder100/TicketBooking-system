@@ -15,7 +15,13 @@ export async function GET() {
   }
 
   const userRow: any = await db.prepare('SELECT id, name, email, role, tenant_id, tenant_role, can_create_events FROM users WHERE id = ?').get(session.userId);
-  const tenantRow: any = session.tenantId ? await db.prepare('SELECT id, name, slug, event_creation_policy FROM tenants WHERE id = ?').get(session.tenantId) : null;
+  let effectiveTenantId = session.tenantId || userRow?.tenant_id;
+  if (!effectiveTenantId && session.role === 'SUPER_ADMIN') {
+    const firstTenant: any = await db.prepare('SELECT id FROM tenants ORDER BY created_at ASC LIMIT 1').get();
+    effectiveTenantId = firstTenant?.id || null;
+  }
+  const tenantRow: any = effectiveTenantId ? await db.prepare('SELECT id, name, slug, event_creation_policy FROM tenants WHERE id = ?').get(effectiveTenantId) : null;
+  const allTenants: any[] = (session.role === 'SUPER_ADMIN' || !userRow?.tenant_id) ? await db.prepare('SELECT id, name, slug FROM tenants ORDER BY created_at ASC').all() : [];
 
   return NextResponse.json({
     success: true,
@@ -24,10 +30,11 @@ export async function GET() {
       name: userRow?.name || session.name,
       email: userRow?.email || session.email,
       role: session.role,
-      tenantId: session.tenantId,
+      tenantId: effectiveTenantId,
       tenantRole: userRow?.tenant_role || session.tenantRole || 'OWNER',
       canCreateEvents: userRow?.can_create_events != null ? Boolean(userRow.can_create_events) : true,
-      tenant: tenantRow
+      tenant: tenantRow,
+      allTenants
     }
   });
 }

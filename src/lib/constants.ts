@@ -5,10 +5,10 @@
 
 export const MERCHANT_CONFIG = {
   legalName: 'Pappu singh',
-  operatingVenue: 'KACHERI Club, town hall, Gorakhpur, 273008',
-  fullAddress: 'KACHERI Club, town hall, Gorakhpur, 273008, Uttar Pradesh, India',
+  operatingVenue: 'KACHERI Club, town hall, Gorakhpur, 273001',
+  fullAddress: 'KACHERI Club, town hall, Gorakhpur, 273001, Uttar Pradesh, India',
   city: 'Gorakhpur',
-  pincode: '273008',
+  pincode: '273001',
   state: 'Uttar Pradesh',
   country: 'India',
   phones: [
@@ -30,8 +30,11 @@ export const SITE_CONFIG = {
   description: 'Multi-tenant live event ticketing & digital entry pass issuance platform. All ticket prices are listed and charged in INR (₹).',
   currency: 'INR',
   currencySymbol: '₹',
-  domain: process.env.WHATSAPP_PUBLIC_BASE_URL || 'https://event.neoclare.com'
+  domain: process.env.WHATSAPP_PUBLIC_BASE_URL || 'https://event.neoclare.com',
+  maxCartLimit: 10
 } as const;
+
+export const MAX_CART_LIMIT = 10;
 
 export const NAV_LINKS = {
   home: '/',

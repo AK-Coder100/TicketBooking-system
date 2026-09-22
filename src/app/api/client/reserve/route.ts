@@ -4,14 +4,22 @@ import { createReservation, getActiveReservation } from '@/lib/reservation';
 export async function POST(request: NextRequest) {
   try {
     const { tierId, sessionToken, quantity } = await request.json();
-    if (!tierId || !sessionToken || !quantity) {
+    if (!tierId || !sessionToken || quantity === undefined || quantity === null) {
       return NextResponse.json({ success: false, error: 'tierId, sessionToken, and quantity are required' }, { status: 400 });
+    }
+
+    const parsedQty = parseInt(quantity, 10);
+    if (isNaN(parsedQty) || parsedQty < 1) {
+      return NextResponse.json({ success: false, error: 'Quantity must be at least 1' }, { status: 400 });
+    }
+    if (parsedQty > 10) {
+      return NextResponse.json({ success: false, error: 'Maximum 10 tickets allowed per booking' }, { status: 400 });
     }
 
     const result = await createReservation({
       tierId,
       sessionToken,
-      quantity: parseInt(quantity, 10)
+      quantity: parsedQty
     });
 
     if (!result.success) {

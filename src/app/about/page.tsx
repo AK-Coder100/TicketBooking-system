@@ -9,7 +9,7 @@ export const metadata = {
 export default function AboutUsPage() {
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto', padding: '36px 20px', color: 'var(--text-muted)' }}>
-      
+
       {/* Top Breadcrumb */}
       <div style={{ marginBottom: 20 }}>
         <Link
@@ -76,7 +76,7 @@ export default function AboutUsPage() {
                 📍 {MERCHANT_CONFIG.operatingVenue}
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: 2 }}>
-                Town Hall, Gorakhpur, UP - 273008
+                Town Hall, Gorakhpur, UP - 273001
               </div>
             </div>
 

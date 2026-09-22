@@ -10,9 +10,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
     const { searchParams } = new URL(request.url);
-    const tenantId = (session.role === 'SUPER_ADMIN' && searchParams.get('tenantId'))
+    let tenantId = (session.role === 'SUPER_ADMIN' && searchParams.get('tenantId'))
       ? searchParams.get('tenantId')
-      : session.tenantId;
+      : (session.tenantId || searchParams.get('tenantId'));
+
+    if (!tenantId && session.role === 'SUPER_ADMIN') {
+      const firstTenant: any = await db.prepare('SELECT id FROM tenants ORDER BY created_at ASC LIMIT 1').get();
+      tenantId = firstTenant?.id;
+    }
 
     if (!tenantId) {
       return NextResponse.json({ success: false, error: 'No tenant context found' }, { status: 400 });
@@ -62,7 +67,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { title, banner_url, description, location, start_date, end_date, sessions: bodySessions } = body;
 
-    const tenantId = (session?.role === 'SUPER_ADMIN' && body.tenantId) ? body.tenantId : session?.tenantId;
+    let tenantId = (session?.role === 'SUPER_ADMIN' && body.tenantId) ? body.tenantId : (session?.tenantId || body.tenantId);
+    if (!tenantId && session?.role === 'SUPER_ADMIN') {
+      const firstTenant: any = await db.prepare('SELECT id FROM tenants ORDER BY created_at ASC LIMIT 1').get();
+      tenantId = firstTenant?.id;
+    }
     if (!tenantId) return NextResponse.json({ success: false, error: 'No tenant context found' }, { status: 400 });
 
     // Profile Permission Check: Verify if user profile is permitted to create events
