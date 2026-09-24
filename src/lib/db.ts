@@ -185,7 +185,7 @@ export async function initSchema(): Promise<void> {
         payment_status VARCHAR(20) DEFAULT 'PENDING',
         gateway_order_id VARCHAR(255),
         gateway_payment_id VARCHAR(255),
-        gateway_type VARCHAR(20) DEFAULT 'CASHFREE',
+        gateway_type VARCHAR(20) DEFAULT 'UPI',
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
 
@@ -211,6 +211,10 @@ export async function initSchema(): Promise<void> {
         metadata TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+
+      -- Ensure orders_gateway_type_check constraint permits UPI
+      ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_gateway_type_check;
+      ALTER TABLE orders ADD CONSTRAINT orders_gateway_type_check CHECK (gateway_type IN ('UPI', 'RAZORPAY', 'CASHFREE'));
     `);
 
     await seedData();
@@ -242,12 +246,12 @@ export async function seedData(): Promise<void> {
     // Default Platform Settings
     await db.exec(`
       INSERT INTO platform_settings (key, value, updated_at) VALUES 
-      ('active_gateway', 'CASHFREE', NOW()),
+      ('active_gateway', 'UPI', NOW()),
       ('default_commission_paise', '200', NOW()),
-      ('fixed_gateway_fee_paise', '100', NOW()),
-      ('gateway_surcharge_percent', '3.0', NOW()),
+      ('fixed_gateway_fee_paise', '0', NOW()),
+      ('gateway_surcharge_percent', '0.0', NOW()),
       ('gst_on_fee_percent', '0', NOW())
-      ON CONFLICT (key) DO NOTHING;
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value WHERE platform_settings.key = 'active_gateway';
     `);
 
   } catch (err: any) {

@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { orderId, paymentId, sessionToken, attendees } = body;
+    const { orderId, paymentId, utr, sessionToken, attendees } = body;
 
     if (!orderId) {
       return NextResponse.json({ success: false, error: 'Order ID is required' }, { status: 400 });
@@ -23,11 +23,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, orderId, tickets: existingTickets });
     }
 
-    // Verify payment with gateway adapter
-    const adapter = PaymentService.getAdapter(order.gateway_type);
+    // Verify payment with UPI adapter
+    const adapter = PaymentService.getAdapter(order.gateway_type || 'UPI');
     const verification = await adapter.verifyPayment({
       orderId: order.gateway_order_id || orderId,
-      paymentId: paymentId || `pay_cf_live_${Date.now()}`
+      paymentId: paymentId || (utr ? `utr_${utr}` : `upi_pay_${Date.now()}`),
+      utr
     });
 
     if (!verification.success) {

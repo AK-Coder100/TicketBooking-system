@@ -308,7 +308,7 @@ export async function GET(
               }}
             >
               <span style={{ fontSize: '9px', color: '#94a3b8', fontWeight: 600 }}>
-                {`ISSUED: ${issuedDateStr} | GATEWAY: ${(ticket.gateway_type || 'CASHFREE').toUpperCase()}`}
+                {`ISSUED: ${issuedDateStr} | GATEWAY: ${(ticket.gateway_type || 'UPI').toUpperCase()}`}
               </span>
               <span style={{ fontSize: '9px', color: '#38bdf8', fontWeight: 800, marginTop: '3px' }}>
                 POWERED BY MULTI-TENANT TICKETING PLATFORM

@@ -51,7 +51,8 @@ export default function TenantCheckoutPage() {
   const [confirmedTickets, setConfirmedTickets] = useState<any[]>([]);
   const [qrCodeMap, setQrCodeMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const [cfSdkLoaded, setCfSdkLoaded] = useState(false);
+  const [enteredUtr, setEnteredUtr] = useState('');
+  const [copiedUpi, setCopiedUpi] = useState(false);
 
   useEffect(() => {
     let token = localStorage.getItem('multi_tenant_session_token');
@@ -89,18 +90,6 @@ export default function TenantCheckoutPage() {
           }
         }
       });
-
-    // Load Cashfree JS SDK
-    if (!document.getElementById('cashfree-sdk')) {
-      const script = document.createElement('script');
-      script.id = 'cashfree-sdk';
-      script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
-      script.onload = () => setCfSdkLoaded(true);
-      script.onerror = () => setCfSdkLoaded(false);
-      document.head.appendChild(script);
-    } else {
-      setCfSdkLoaded(true);
-    }
   }, [tenantSlug, preselectedEventId]);
 
   // Countdown timer effect
@@ -279,6 +268,7 @@ export default function TenantCheckoutPage() {
     }
 
     setLoading(true);
+    setErrorMsg(null);
     try {
       const primaryTierId = attendees[0]?.tierId || sortedFilteredTiers[0]?.id;
 
@@ -289,9 +279,9 @@ export default function TenantCheckoutPage() {
           tierId: primaryTierId,
           quantity: attendees.length,
           sessionToken,
-          customerName: 'Guest',
+          customerName: attendees[0]?.name || 'Guest',
           customerPhone: whatsappPhone.trim(),
-          customerEmail: '',
+          customerEmail: custEmail.trim(),
           attendees: attendees.map((a, idx) => ({
             name: a.name || `Guest ${idx + 1}`,
             age: parseInt(a.age, 10) || 18,
@@ -303,44 +293,16 @@ export default function TenantCheckoutPage() {
       if (!res.ok || !data.success) throw new Error(data.error || 'Checkout failed');
 
       setPendingOrder(data);
-
-      const cf = (window as any).Cashfree;
-      const sessionId = data.gatewayOrder?.paymentSessionId;
-      if (cf && sessionId && typeof sessionId === 'string' && !sessionId.startsWith('session_cf_')) {
-        try {
-          const cashfree = cf({ mode: data.gatewayOrder.env || 'sandbox' });
-          setLoading(false);
-          cashfree.checkout({
-            paymentSessionId: data.gatewayOrder.paymentSessionId,
-            redirectTarget: '_modal',
-          }).then(async (result: any) => {
-            if (result.error) {
-              setErrorMsg('Payment failed: ' + (result.error.message || 'Gateway error'));
-            } else if (result.paymentDetails) {
-              await finalizePayment(data.orderId, result.paymentDetails.paymentMessage || `cf_${Date.now()}`);
-            }
-          });
-          return;
-        } catch (sdkErr) {
-          console.warn('Cashfree SDK error', sdkErr);
-        }
-      }
-
-      if (data.gatewayOrder?.env === 'simulation') {
-        setShowPaymentModal(true);
-      } else {
-        throw new Error('Payment Gateway Error: Unable to initialize payment session. Please verify payment credentials.');
-      }
+      setShowPaymentModal(true);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Payment error');
+      setErrorMsg(err.message || 'Payment initiation error');
     } finally {
       setLoading(false);
     }
   };
 
-  // Shared finalization
-  const finalizePayment = async (orderId: string, paymentId: string) => {
-    setShowPaymentModal(false);
+  // Finalize payment and generate tickets
+  const finalizePayment = async (orderId: string, paymentId?: string, utr?: string) => {
     setLoading(true);
     setErrorMsg(null);
     try {
@@ -352,7 +314,8 @@ export default function TenantCheckoutPage() {
         body: JSON.stringify({
           orderId,
           tierId: primaryTierId,
-          paymentId,
+          paymentId: paymentId || (utr ? `utr_${utr}` : `upi_pay_${Date.now()}`),
+          utr: utr || undefined,
           sessionToken,
           attendees: attendees.map(a => ({
             name: a.name.trim(),
@@ -364,6 +327,7 @@ export default function TenantCheckoutPage() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Payment verification failed');
 
+      setShowPaymentModal(false);
       setSecondsRemaining(null);
 
       const orderRes = await fetch(`/api/client/orders/${data.orderId}`);
@@ -387,9 +351,26 @@ export default function TenantCheckoutPage() {
     }
   };
 
-  const handleSimulatePaymentCapture = async () => {
+  const handleVerifyUpiPayment = async () => {
     if (!pendingOrder) return;
-    await finalizePayment(pendingOrder.orderId, `pay_sim_${Date.now()}`);
+    const cleanUtr = enteredUtr.trim();
+    if (cleanUtr && !/^\d{12}$/.test(cleanUtr)) {
+      setErrorMsg('Please enter a valid 12-digit numeric UPI Ref / UTR number.');
+      return;
+    }
+    await finalizePayment(
+      pendingOrder.orderId,
+      cleanUtr ? `utr_${cleanUtr}` : `upi_pay_${Date.now()}`,
+      cleanUtr || undefined
+    );
+  };
+
+  const handleCopyUpiId = (upiId: string) => {
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(upiId);
+      setCopiedUpi(true);
+      setTimeout(() => setCopiedUpi(false), 2500);
+    }
   };
 
   return (
@@ -714,45 +695,254 @@ export default function TenantCheckoutPage() {
               style={{ width: '100%', padding: '12px 16px', fontSize: '0.95rem', fontWeight: 700 }}
               disabled={loading}
             >
-              {loading ? 'Initiating...' : `Make Payment (₹${breakdown ? (breakdown.totalChargedPaise / 100).toFixed(2) : ''})`}
+              {loading ? 'Generating UPI Session...' : `Pay via UPI (₹${breakdown ? (breakdown.totalChargedPaise / 100).toFixed(2) : ''})`}
             </button>
           </form>
         </div>
       )}
 
-      {/* PAYMENT MODAL */}
-      {showPaymentModal && pendingOrder && (
-        <div className="modal-backdrop">
-          <div className="modal-dialog" style={{ maxWidth: 400, borderRadius: 14 }}>
-            <div className="modal-header" style={{ padding: '12px 16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>🛡️</span>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '0.95rem' }}>Cashfree PG / Razorpay</h3>
+      {/* UPI PAYMENT MODAL */}
+      {showPaymentModal && pendingOrder && (() => {
+        const upiData = pendingOrder.upiSession || pendingOrder.gatewayOrder?.upiSession || pendingOrder.gatewayOrder || {};
+        const upiId = upiData.merchantUpiId || 'BHARATPE.8J0S0Z9W9S44900@FBPE';
+        const upiLink = upiData.upiLink || `upi://pay?pa=${encodeURIComponent(upiId)}&pn=Tickets&tr=${encodeURIComponent(pendingOrder.orderId)}&tn=${encodeURIComponent('Order ' + pendingOrder.orderId)}&am=${(pendingOrder.breakdown.totalChargedPaise / 100).toFixed(2)}&cu=INR&mode=02`;
+        const appLinks = upiData.appLinks || {};
+
+        return (
+          <div className="modal-backdrop">
+            <div className="modal-dialog" style={{ maxWidth: 440, borderRadius: 16, background: '#0f172a', border: '1px solid rgba(255, 255, 255, 0.15)', boxShadow: '0 20px 50px rgba(0,0,0,0.6)' }}>
+              <div className="modal-header" style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: '1.2rem' }}>⚡</span>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#f8fafc' }}>Direct UPI Payment</h3>
+                    <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Zero Gateway Fees • Instant Ticket Delivery</div>
+                  </div>
                 </div>
-              </div>
-              <button onClick={() => setShowPaymentModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.3rem', cursor: 'pointer', padding: 0 }}>&times;</button>
-            </div>
-            <div className="modal-body" style={{ padding: 14 }}>
-              <div style={{ textAlign: 'center', marginBottom: 14 }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Amount to Pay</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#34d399', margin: '2px 0' }}>
-                  ₹{(pendingOrder.breakdown.totalChargedPaise / 100).toFixed(2)}
-                </div>
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.4rem', cursor: 'pointer', padding: 0 }}
+                  aria-label="Close"
+                >
+                  &times;
+                </button>
               </div>
 
-              <button
-                className="btn btn-primary"
-                style={{ width: '100%', padding: '12px', fontSize: '0.92rem', fontWeight: 700 }}
-                onClick={handleSimulatePaymentCapture}
-                disabled={loading}
-              >
-                {loading ? 'Verifying...' : '✅ Complete Payment'}
-              </button>
+              <div className="modal-body" style={{ padding: '18px 20px', maxHeight: '82vh', overflowY: 'auto' }}>
+                {/* Hold Timer Alert */}
+                {secondsRemaining !== null && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    padding: '6px 12px',
+                    borderRadius: 8,
+                    background: secondsRemaining < 120 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                    border: secondsRemaining < 120 ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)',
+                    color: secondsRemaining < 120 ? '#fca5a5' : '#93c5fd',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    marginBottom: 14
+                  }}>
+                    <span>⏱️</span>
+                    <span>Hold Reserved: <b>{formatTimer(secondsRemaining)}</b></span>
+                  </div>
+                )}
+
+                {/* Amount Display */}
+                <div style={{ textAlign: 'center', marginBottom: 14, background: 'rgba(255, 255, 255, 0.03)', padding: '10px 14px', borderRadius: 12, border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Amount to Pay</div>
+                  <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#34d399', margin: '2px 0' }}>
+                    ₹{(pendingOrder.breakdown.totalChargedPaise / 100).toFixed(2)}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Order Ref: <code style={{ color: '#cbd5e1' }}>{pendingOrder.orderId}</code></div>
+                </div>
+
+                {/* QR Code Section */}
+                {upiData.qrCode && (
+                  <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                    <div style={{
+                      display: 'inline-block',
+                      padding: 10,
+                      background: '#ffffff',
+                      borderRadius: 14,
+                      boxShadow: '0 8px 30px rgba(0, 0, 0, 0.35)'
+                    }}>
+                      <img
+                        src={upiData.qrCode}
+                        alt="UPI Payment QR Code"
+                        style={{ width: 190, height: 190, display: 'block', borderRadius: 8 }}
+                      />
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#cbd5e1', fontWeight: 600, marginTop: 8 }}>
+                      Scan with any UPI App to Pay
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 6, marginTop: 6, fontSize: '0.7rem', color: '#94a3b8' }}>
+                      <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)' }}>Google Pay</span>
+                      <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)' }}>PhonePe</span>
+                      <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)' }}>Paytm</span>
+                      <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)' }}>BHIM</span>
+                      <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)' }}>Cred</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Mobile Intent Buttons */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: '0.73rem', color: '#94a3b8', marginBottom: 6, fontWeight: 600 }}>Pay Directly on Mobile:</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                    <a
+                      href={appLinks.gpay || upiLink}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                        background: 'rgba(66, 133, 244, 0.15)',
+                        border: '1px solid rgba(66, 133, 244, 0.35)',
+                        color: '#60a5fa',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        textDecoration: 'none'
+                      }}
+                    >
+                      <span>⚡</span> Google Pay
+                    </a>
+                    <a
+                      href={appLinks.phonepe || upiLink}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                        background: 'rgba(103, 58, 183, 0.15)',
+                        border: '1px solid rgba(103, 58, 183, 0.35)',
+                        color: '#c084fc',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        textDecoration: 'none'
+                      }}
+                    >
+                      <span>⚡</span> PhonePe
+                    </a>
+                    <a
+                      href={appLinks.paytm || upiLink}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                        background: 'rgba(0, 186, 242, 0.15)',
+                        border: '1px solid rgba(0, 186, 242, 0.35)',
+                        color: '#38bdf8',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        textDecoration: 'none'
+                      }}
+                    >
+                      <span>⚡</span> Paytm
+                    </a>
+                    <a
+                      href={upiLink}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                        background: 'rgba(16, 185, 129, 0.15)',
+                        border: '1px solid rgba(16, 185, 129, 0.35)',
+                        color: '#34d399',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        textDecoration: 'none'
+                      }}
+                    >
+                      <span>⚡</span> Any UPI App
+                    </a>
+                  </div>
+                </div>
+
+                {/* UTR Verification Section */}
+                <div style={{
+                  padding: 12,
+                  borderRadius: 10,
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  marginBottom: 14
+                }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
+                    Confirm Payment (12-Digit UPI UTR / Ref)
+                  </label>
+                  <p style={{ fontSize: '0.71rem', color: '#94a3b8', margin: '0 0 8px 0' }}>
+                    After completing payment in your UPI app, paste the 12-digit UTR/RRN number (or confirm below):
+                  </p>
+                  <input
+                    type="text"
+                    maxLength={12}
+                    placeholder="e.g. 423819283719 (12 digits)"
+                    value={enteredUtr}
+                    onChange={(e) => setEnteredUtr(e.target.value.replace(/[^0-9]/g, ''))}
+                    className="form-control"
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontSize: '0.85rem',
+                      fontFamily: 'monospace',
+                      borderRadius: 8,
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      color: '#ffffff'
+                    }}
+                  />
+                </div>
+
+                {errorMsg && (
+                  <div style={{
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#fca5a5',
+                    fontSize: '0.78rem',
+                    marginBottom: 12
+                  }}>
+                    {errorMsg}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    fontSize: '0.92rem',
+                    fontWeight: 700,
+                    borderRadius: 8
+                  }}
+                  onClick={handleVerifyUpiPayment}
+                  disabled={loading}
+                >
+                  {loading ? 'Verifying UPI...' : '✅ I Have Paid — Confirm & Get Tickets'}
+                </button>
+
+                <div style={{ textAlign: 'center', marginTop: 10, fontSize: '0.7rem', color: '#64748b' }}>
+                  Entry passes with QR code will be generated instantly and dispatched to your WhatsApp.
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* STEP 4: CONFIRMATION */}
       {step === 'status' && confirmedOrder && (

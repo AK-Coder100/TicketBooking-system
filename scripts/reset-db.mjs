@@ -139,7 +139,7 @@ async function resetDb() {
         payment_status TEXT CHECK(payment_status IN ('PENDING', 'PAID', 'FAILED')) DEFAULT 'PENDING',
         gateway_order_id TEXT,
         gateway_payment_id TEXT,
-        gateway_type TEXT CHECK(gateway_type IN ('RAZORPAY', 'CASHFREE')) DEFAULT 'CASHFREE',
+        gateway_type TEXT CHECK(gateway_type IN ('UPI', 'RAZORPAY', 'CASHFREE')) DEFAULT 'UPI',
         created_at TEXT NOT NULL
       );
 
@@ -172,12 +172,12 @@ async function resetDb() {
     // Seed Platform Settings
     await client.query(`
       INSERT INTO platform_settings (key, value, updated_at) VALUES 
-      ('active_gateway', 'CASHFREE', $1),
+      ('active_gateway', 'UPI', $1),
       ('default_commission_paise', '200', $1),
-      ('fixed_gateway_fee_paise', '100', $1),
-      ('gateway_surcharge_percent', '3.0', $1),
+      ('fixed_gateway_fee_paise', '0', $1),
+      ('gateway_surcharge_percent', '0.0', $1),
       ('gst_on_fee_percent', '0', $1)
-      ON CONFLICT (key) DO NOTHING
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value WHERE platform_settings.key = 'active_gateway'
     `, [now]);
 
     // Seed Super Admin

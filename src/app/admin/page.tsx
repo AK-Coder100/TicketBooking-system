@@ -25,7 +25,7 @@ export default function SuperAdminDashboard() {
   });
 
   // Gateway config state
-  const [activeGateway, setActiveGateway] = useState('CASHFREE');
+  const [activeGateway, setActiveGateway] = useState('UPI');
   const [commissionPaise, setCommissionPaise] = useState('200');
 
   useEffect(() => {
@@ -328,10 +328,9 @@ export default function SuperAdminDashboard() {
 
               <div className="glass-panel" style={{ padding: 28, maxWidth: 640 }}>
                 <div className="form-group">
-                  <label className="form-label">Active Platform Gateway</label>
+                  <label className="form-label">Active Platform Payment Mode</label>
                   <select className="form-control" value={activeGateway} onChange={(e) => setActiveGateway(e.target.value)}>
-                    <option value="CASHFREE">Cashfree (Easy Split Marketplace - PG API v3)</option>
-                    <option value="RAZORPAY">Razorpay (Route Multi-Party Split)</option>
+                    <option value="UPI">Direct UPI Service (Zero Gateway Fee / Instant Settlement via UpiService)</option>
                   </select>
                 </div>
 

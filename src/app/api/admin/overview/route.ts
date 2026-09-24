@@ -51,7 +51,7 @@ export async function GET() {
         activeTenantsCount,
         totalTenantsCount,
         totalTicketsSold,
-        activeGateway: settings.active_gateway || 'CASHFREE'
+        activeGateway: settings.active_gateway || 'UPI'
       },
       recentOrders,
       settings

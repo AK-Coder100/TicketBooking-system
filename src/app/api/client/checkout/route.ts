@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     const platformSettings: Record<string, string> = {};
     for (const r of settingRows) platformSettings[r.key] = r.value;
 
-    const activeGateway = platformSettings.active_gateway || 'CASHFREE';
+    const activeGateway = 'UPI';
     const breakdown = computeSplitRules({
       basePricePaise,
       ticketCount: count,
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
       now
     );
 
-    // Create gateway order
+    // Create UPI payment session order
     const adapter = PaymentService.getAdapter(activeGateway);
     let gatewayOrder: any;
     try {
@@ -152,7 +152,10 @@ export async function POST(request: NextRequest) {
           platformFeePaise: breakdown.platformFeePaise,
           organizerNetPayoutPaise: breakdown.organizerNetPayoutPaise
         },
-        orderId
+        orderId,
+        eventTitle: primaryTier.event_title,
+        tenantUpiId: primaryTier.gateway_account_id,
+        tenantName: primaryTier.tenant_name
       });
     } catch (orderErr: any) {
       await db.prepare(`UPDATE orders SET payment_status = 'FAILED' WHERE id = ?`).run(orderId);
@@ -166,6 +169,7 @@ export async function POST(request: NextRequest) {
       success: true,
       orderId,
       gatewayOrder,
+      upiSession: gatewayOrder.upiSession,
       breakdown,
       // echo back so verify-payment can reuse
       resolvedAttendees: attendeeList

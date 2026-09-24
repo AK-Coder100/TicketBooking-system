@@ -142,7 +142,7 @@ export async function generateTicketPdf({ ticket, order, event, tier, tenant }: 
       doc.fillColor('#94a3b8')
          .fontSize(8)
          .font('Helvetica')
-         .text(`ISSUED: ${new Date(ticket.created_at).toLocaleString('en-IN')} | GATEWAY: ${order.gateway_type}`, cardX + 24, cardY + cardH - 34);
+         .text(`ISSUED: ${new Date(ticket.created_at).toLocaleString('en-IN')} | GATEWAY: ${order.gateway_type || 'UPI'}`, cardX + 24, cardY + cardH - 34);
 
       doc.fillColor('#38bdf8')
          .fontSize(8)
