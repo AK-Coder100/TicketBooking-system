@@ -66,12 +66,15 @@ const DEFAULT_EVENT = {
 // ─── Inner Dashboard Component ────────────────────────────────────────────────
 function OrganizerDashboardInner() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'events' | 'teams' | 'profile'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'requests' | 'events' | 'teams' | 'profile'>('dashboard');
   const [events, setEvents] = useState<any[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [attendees, setAttendees] = useState<any[]>([]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({});
+  const [pendingOrders, setPendingOrders] = useState<any[]>([]);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncToast, setSyncToast] = useState(false);
 
@@ -110,8 +113,8 @@ function OrganizerDashboardInner() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
-      if (tabParam === 'events' || tabParam === 'teams' || tabParam === 'profile' || tabParam === 'dashboard') {
-        setActiveTab(tabParam);
+      if (tabParam === 'events' || tabParam === 'teams' || tabParam === 'profile' || tabParam === 'dashboard' || tabParam === 'requests') {
+        setActiveTab(tabParam as any);
       } else if (tabParam === 'scanner') {
         setActiveTab('dashboard');
         setScannerModalOpen(true);
@@ -128,7 +131,7 @@ function OrganizerDashboardInner() {
   }, []);
 
   // ── Tab Switcher with URL persistence ──
-  const switchTab = (tab: 'dashboard' | 'events' | 'scanner' | 'teams' | 'profile') => {
+  const switchTab = (tab: 'dashboard' | 'requests' | 'events' | 'scanner' | 'teams' | 'profile') => {
     if (tab === 'scanner') {
       setScannerModalOpen(true);
       if (typeof window !== 'undefined') {
@@ -143,6 +146,46 @@ function OrganizerDashboardInner() {
       const url = new URL(window.location.href);
       url.searchParams.set('tab', tab);
       window.history.replaceState(null, '', url.toString());
+    }
+  };
+
+  const [orderActionModal, setOrderActionModal] = useState<{
+    orderId: string;
+    customerName: string;
+    customerPhone: string;
+    amountFormatted: string;
+    eventTitle?: string;
+    type: 'CONFIRM' | 'DECLINE';
+  } | null>(null);
+
+  const executeOrderAction = async () => {
+    if (!orderActionModal) return;
+    const { orderId, type } = orderActionModal;
+    setActionLoadingId(orderId);
+    setActionFeedback(null);
+    try {
+      const endpoint = type === 'CONFIRM'
+        ? `/api/tenant/orders/${orderId}/confirm`
+        : `/api/tenant/orders/${orderId}/decline`;
+
+      const res = await fetch(endpoint, { method: 'POST' });
+      const json = await res.json();
+      if (json.success) {
+        setActionFeedback({
+          type: 'success',
+          message: json.message || (type === 'CONFIRM'
+            ? 'Payment confirmed! Official tickets sent to customer WhatsApp.'
+            : 'Booking request declined. Order retained in database.')
+        });
+        setOrderActionModal(null);
+        await loadAnalytics();
+      } else {
+        setActionFeedback({ type: 'error', message: json.error || `Failed to ${type.toLowerCase()} order` });
+      }
+    } catch (err: any) {
+      setActionFeedback({ type: 'error', message: err.message || `Error processing order` });
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
@@ -304,6 +347,7 @@ function OrganizerDashboardInner() {
         setStats(json.stats || {});
         setAttendees(json.attendees || []);
         setAuditLogs(json.auditLogs || []);
+        setPendingOrders(json.pendingOrders || []);
       }
     } catch (e) { console.error(e); }
   };
@@ -638,6 +682,28 @@ function OrganizerDashboardInner() {
 
         {/* Right: Tenant Switcher (if multi-tenant) & Profile Button */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          {pendingOrders.length > 0 && (
+            <button
+              type="button"
+              onClick={() => switchTab('requests')}
+              style={{
+                background: 'rgba(245, 158, 11, 0.2)',
+                border: '1px solid rgba(245, 158, 11, 0.45)',
+                color: '#fbbf24',
+                padding: '5px 12px',
+                borderRadius: 8,
+                fontSize: '0.76rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}
+            >
+              <span>🔔</span>
+              <span>{pendingOrders.length} Pending</span>
+            </button>
+          )}
           {userProfile?.allTenants && userProfile.allTenants.length > 1 && (
             <select
               className="form-control"
@@ -753,6 +819,77 @@ function OrganizerDashboardInner() {
                 {syncing ? 'Syncing...' : 'Sync'}
               </button>
             </div>
+
+            {/* Action Feedback Banner */}
+            {actionFeedback && (
+              <div style={{
+                background: actionFeedback.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                border: `1px solid ${actionFeedback.type === 'success' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+                borderRadius: 12,
+                padding: '12px 16px',
+                marginBottom: 16,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                color: actionFeedback.type === 'success' ? '#6ee7b7' : '#fca5a5',
+                fontSize: '0.86rem',
+                fontWeight: 600
+              }}>
+                <span>{actionFeedback.type === 'success' ? '✅' : '⚠️'} {actionFeedback.message}</span>
+                <button
+                  type="button"
+                  onClick={() => setActionFeedback(null)}
+                  style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '1.1rem' }}
+                >
+                  &times;
+                </button>
+              </div>
+            )}
+
+            {/* Pending Requests Alert Banner */}
+            {pendingOrders.length > 0 && (
+              <div style={{
+                background: 'rgba(245, 158, 11, 0.12)',
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                borderRadius: 14,
+                padding: '14px 18px',
+                marginBottom: 18,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 12
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: '1.4rem' }}>🔔</span>
+                  <div>
+                    <div style={{ color: '#fbbf24', fontWeight: 800, fontSize: '0.92rem' }}>
+                      {pendingOrders.length} Pending Booking Request{pendingOrders.length > 1 ? 's' : ''} Awaiting Payment Verification
+                    </div>
+                    <div style={{ color: '#cbd5e1', fontSize: '0.78rem' }}>
+                      Attendees have completed UPI checkout and are waiting for your approval to receive their WhatsApp tickets.
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => switchTab('requests')}
+                  style={{
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                    boxShadow: '0 4px 14px rgba(245, 158, 11, 0.35)'
+                  }}
+                >
+                  Review Requests ({pendingOrders.length}) →
+                </button>
+              </div>
+            )}
 
             {/* 4 Stat KPI Cards */}
             <div style={{
@@ -1221,6 +1358,314 @@ function OrganizerDashboardInner() {
         )}
 
         {/* ════════════════════════════════════════════════════════════════════
+            TAB: REQUESTS (PENDING PAYMENT VERIFICATION)
+           ════════════════════════════════════════════════════════════════════ */}
+        {activeTab === 'requests' && (
+          <div style={{ width: '100%', boxSizing: 'border-box' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <h1 style={{ fontSize: '1.65rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', margin: 0 }}>
+                    Pending Booking Requests
+                  </h1>
+                  <span style={{
+                    background: 'rgba(245, 158, 11, 0.2)',
+                    color: '#fbbf24',
+                    border: '1px solid rgba(245, 158, 11, 0.4)',
+                    padding: '2px 10px',
+                    borderRadius: 9999,
+                    fontSize: '0.74rem',
+                    fontWeight: 800
+                  }}>
+                    {pendingOrders.length} Waiting Verification
+                  </span>
+                </div>
+                <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: 4, marginBottom: 0 }}>
+                  Match the submitted 12-digit UTR against your UPI app / bank SMS. Confirm to generate tickets and WhatsApp them directly to the customer, or decline the request without database deletion.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => loadAnalytics()}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#e2e8f0',
+                  borderRadius: 10,
+                  padding: '7px 14px',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}
+              >
+                🔄 Refresh
+              </button>
+            </div>
+
+            {/* Action Feedback Banner */}
+            {actionFeedback && (
+              <div style={{
+                background: actionFeedback.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                border: `1px solid ${actionFeedback.type === 'success' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+                borderRadius: 12,
+                padding: '12px 16px',
+                marginBottom: 16,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                color: actionFeedback.type === 'success' ? '#6ee7b7' : '#fca5a5',
+                fontSize: '0.86rem',
+                fontWeight: 600
+              }}>
+                <span>{actionFeedback.type === 'success' ? '✅' : '⚠️'} {actionFeedback.message}</span>
+                <button
+                  type="button"
+                  onClick={() => setActionFeedback(null)}
+                  style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '1.1rem' }}
+                >
+                  &times;
+                </button>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {pendingOrders.length === 0 ? (
+              <div style={{
+                background: '#0d1322',
+                border: '1px solid #1e293b',
+                borderRadius: 16,
+                padding: '48px 24px',
+                textAlign: 'center',
+                color: '#94a3b8'
+              }}>
+                <div style={{ fontSize: '3rem', marginBottom: 12 }}>🎉</div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#ffffff', marginBottom: 6 }}>
+                  All Caught Up!
+                </h3>
+                <p style={{ fontSize: '0.85rem', maxWidth: 440, margin: '0 auto 16px', color: '#64748b' }}>
+                  There are no pending booking requests awaiting payment confirmation. When customers complete UPI checkout for your events, they will appear here instantly.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => switchTab('dashboard')}
+                  className="btn btn-secondary btn-sm"
+                  style={{ padding: '8px 18px', fontSize: '0.82rem' }}
+                >
+                  Return to Dashboard
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {pendingOrders.map((order: any) => {
+                  let attendeesList: any[] = [];
+                  try {
+                    if (order.attendees_data) {
+                      attendeesList = JSON.parse(order.attendees_data);
+                    }
+                  } catch (e) {}
+
+                  const utrText = order.gateway_payment_id || order.payment_reference || 'Self-reported by customer';
+
+                  return (
+                    <div
+                      key={order.id}
+                      style={{
+                        background: '#0d1322',
+                        border: '1px solid rgba(245, 158, 11, 0.35)',
+                        borderRadius: 16,
+                        padding: '18px 20px',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      {/* Top Header of Card */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ffffff' }}>
+                              Booking #{order.id}
+                            </span>
+                            <span style={{
+                              background: 'rgba(245, 158, 11, 0.15)',
+                              color: '#fbbf24',
+                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                              padding: '2px 8px',
+                              borderRadius: 6,
+                              fontSize: '0.72rem',
+                              fontWeight: 700
+                            }}>
+                              Awaiting Verification
+                            </span>
+                            <span style={{
+                              background: 'rgba(99, 102, 241, 0.15)',
+                              color: '#a5b4fc',
+                              padding: '2px 8px',
+                              borderRadius: 6,
+                              fontSize: '0.72rem',
+                              fontWeight: 700
+                            }}>
+                              {order.gateway_type || 'UPI'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: 4 }}>
+                            Event: <b style={{ color: '#e2e8f0' }}>{order.display_event_title || order.event_title || 'General Event'}</b>
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 2 }}>
+                            Submitted on: {new Date(order.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                          </div>
+                        </div>
+
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Amount to Verify</div>
+                          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#34d399' }}>
+                            ₹{(order.total_charged / 100).toFixed(2)}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                            Base: ₹{(order.total_base_price / 100).toFixed(2)} + Fee: ₹{(order.platform_fee / 100).toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Info Grid: Customer, Submitted UTR, Attendees */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                        gap: 12,
+                        padding: '14px',
+                        background: 'rgba(15, 23, 42, 0.65)',
+                        borderRadius: 12,
+                        marginBottom: 14
+                      }}>
+                        <div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: 3 }}>Customer Details</div>
+                          <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#ffffff' }}>{order.customer_name}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                            <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>📱 {order.customer_phone || 'No phone'}</span>
+                            {order.customer_phone && (
+                              <a
+                                href={`https://wa.me/${order.customer_phone.replace(/\D/g, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  background: 'rgba(16, 185, 129, 0.2)',
+                                  color: '#34d399',
+                                  padding: '2px 8px',
+                                  borderRadius: 6,
+                                  fontSize: '0.68rem',
+                                  fontWeight: 700,
+                                  textDecoration: 'none',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4
+                                }}
+                              >
+                                WhatsApp ↗
+                              </a>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: 3 }}>Submitted UTR / Transaction Ref</div>
+                          <div style={{
+                            fontFamily: 'monospace',
+                            fontWeight: 800,
+                            fontSize: '0.92rem',
+                            color: '#fbbf24',
+                            background: 'rgba(245, 158, 11, 0.12)',
+                            padding: '5px 10px',
+                            borderRadius: 6,
+                            display: 'inline-block'
+                          }}>
+                            {utrText}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 3 }}>
+                            Match with your UPI bank account statement before approving.
+                          </div>
+                        </div>
+
+                        <div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: 3 }}>
+                            Passes Requested ({attendeesList.length || 1})
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
+                            {attendeesList.length > 0 ? (
+                              attendeesList.map((a: any, i: number) => (
+                                <div key={i} style={{ marginBottom: 2 }}>
+                                  • {a.name || order.customer_name} (Age: {a.age || 18})
+                                </div>
+                              ))
+                            ) : (
+                              <div>• {order.customer_name} (Primary Guest)</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, paddingTop: 10, borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                        <button
+                          type="button"
+                          disabled={actionLoadingId === order.id}
+                          onClick={() => setOrderActionModal({
+                            orderId: order.id,
+                            customerName: order.customer_name,
+                            customerPhone: order.customer_phone,
+                            amountFormatted: `₹${(order.total_charged / 100).toFixed(2)}`,
+                            eventTitle: order.display_event_title || order.event_title,
+                            type: 'DECLINE'
+                          })}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            border: '1px solid rgba(239, 68, 68, 0.35)',
+                            color: '#fca5a5',
+                            padding: '8px 16px',
+                            borderRadius: 8,
+                            fontSize: '0.82rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ❌ Decline Request
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actionLoadingId === order.id}
+                          onClick={() => setOrderActionModal({
+                            orderId: order.id,
+                            customerName: order.customer_name,
+                            customerPhone: order.customer_phone,
+                            amountFormatted: `₹${(order.total_charged / 100).toFixed(2)}`,
+                            eventTitle: order.display_event_title || order.event_title,
+                            type: 'CONFIRM'
+                          })}
+                          style={{
+                            background: 'linear-gradient(135deg, #10b981, #059669)',
+                            border: 'none',
+                            color: '#ffffff',
+                            padding: '8px 18px',
+                            borderRadius: 8,
+                            fontSize: '0.82rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+                          }}
+                        >
+                          ✅ Confirm Payment & Send Tickets
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════════════
             TAB: EVENTS
            ════════════════════════════════════════════════════════════════════ */}
         {activeTab === 'events' && (
@@ -1582,6 +2027,53 @@ function OrganizerDashboardInner() {
           </svg>
         </button>
 
+        {/* Nav: Requests */}
+        <button
+          type="button"
+          onClick={() => switchTab('requests')}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: activeTab === 'requests' ? '#f59e0b' : '#64748b',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 3,
+            cursor: 'pointer',
+            fontSize: '0.72rem',
+            fontWeight: activeTab === 'requests' ? 700 : 500,
+            padding: '4px 8px',
+            position: 'relative'
+          }}
+        >
+          <div style={{ position: 'relative' }}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            {pendingOrders.length > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: -5,
+                right: -8,
+                background: '#ef4444',
+                color: '#fff',
+                borderRadius: '50%',
+                width: 15,
+                height: 15,
+                fontSize: '0.62rem',
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {pendingOrders.length}
+              </span>
+            )}
+          </div>
+          Requests
+        </button>
+
         {/* Nav 4: Teams */}
         <button
           type="button"
@@ -1633,6 +2125,155 @@ function OrganizerDashboardInner() {
           Profile
         </button>
       </nav>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          MODAL: CONFIRM / DECLINE ORDER ACTION DIALOG
+         ════════════════════════════════════════════════════════════════════ */}
+      {orderActionModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(3, 7, 18, 0.85)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 120,
+          padding: 16,
+          boxSizing: 'border-box'
+        }}>
+          <div style={{
+            background: '#0f172a',
+            border: `1px solid ${orderActionModal.type === 'CONFIRM' ? 'rgba(16, 185, 129, 0.45)' : 'rgba(239, 68, 68, 0.45)'}`,
+            borderRadius: 20,
+            maxWidth: 480,
+            width: '100%',
+            padding: 24,
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.75)',
+            boxSizing: 'border-box'
+          }}>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div style={{
+                width: 44,
+                height: 44,
+                borderRadius: '50%',
+                background: orderActionModal.type === 'CONFIRM' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                color: orderActionModal.type === 'CONFIRM' ? '#34d399' : '#f87171',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.4rem',
+                flexShrink: 0
+              }}>
+                {orderActionModal.type === 'CONFIRM' ? '✓' : '⚠️'}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffffff', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {orderActionModal.type === 'CONFIRM' ? 'Confirm Payment & Issue Passes' : 'Decline Booking Request'}
+                </h3>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: 2 }}>
+                  Booking ID: <code style={{ color: '#fbbf24' }}>{orderActionModal.orderId}</code>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOrderActionModal(null)}
+                style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '1.4rem', cursor: 'pointer', padding: 4 }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.03)',
+              borderRadius: 12,
+              padding: '14px 16px',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              marginBottom: 18,
+              fontSize: '0.84rem',
+              color: '#cbd5e1',
+              lineHeight: 1.5
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ color: '#94a3b8' }}>Customer:</span>
+                <span style={{ fontWeight: 700, color: '#ffffff' }}>{orderActionModal.customerName}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ color: '#94a3b8' }}>WhatsApp:</span>
+                <span style={{ color: '#38bdf8' }}>{orderActionModal.customerPhone}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ color: '#94a3b8' }}>Amount to Verify:</span>
+                <span style={{ fontWeight: 800, color: '#34d399' }}>{orderActionModal.amountFormatted}</span>
+              </div>
+              {orderActionModal.eventTitle && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#94a3b8' }}>Event:</span>
+                  <span style={{ color: '#e2e8f0', textAlign: 'right', maxWidth: '60%' }}>{orderActionModal.eventTitle}</span>
+                </div>
+              )}
+            </div>
+
+            <p style={{ fontSize: '0.82rem', color: '#94a3b8', marginBottom: 20, lineHeight: 1.5 }}>
+              {orderActionModal.type === 'CONFIRM'
+                ? 'Have you verified this transaction in your UPI or bank statement? Approving will generate the cryptographically signed QR tickets and dispatch them directly to the attendee via WhatsApp.'
+                : 'Are you sure you want to decline this booking request? The record will remain stored in the database as DECLINED without deletion, and a WhatsApp notification will be sent informing the attendee.'}
+            </p>
+
+            {/* Modal Footer Buttons */}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setOrderActionModal(null)}
+                disabled={actionLoadingId === orderActionModal.orderId}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#cbd5e1',
+                  padding: '9px 18px',
+                  borderRadius: 8,
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={executeOrderAction}
+                disabled={actionLoadingId === orderActionModal.orderId}
+                style={{
+                  background: orderActionModal.type === 'CONFIRM'
+                    ? 'linear-gradient(135deg, #10b981, #059669)'
+                    : 'linear-gradient(135deg, #f43f5e, #e11d48)',
+                  border: 'none',
+                  color: '#ffffff',
+                  padding: '9px 20px',
+                  borderRadius: 8,
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: orderActionModal.type === 'CONFIRM'
+                    ? '0 4px 14px rgba(16, 185, 129, 0.35)'
+                    : '0 4px 14px rgba(244, 63, 94, 0.35)'
+                }}
+              >
+                {actionLoadingId === orderActionModal.orderId
+                  ? 'Processing...'
+                  : orderActionModal.type === 'CONFIRM'
+                    ? 'Yes, Confirm & Send Tickets'
+                    : 'Yes, Decline Request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ════════════════════════════════════════════════════════════════════
           MODAL: GATE QR SCANNER TERMINAL (Mobile Fluid & No Overflow)

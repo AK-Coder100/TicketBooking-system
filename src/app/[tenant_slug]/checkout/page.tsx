@@ -947,91 +947,141 @@ export default function TenantCheckoutPage() {
       {/* STEP 4: CONFIRMATION */}
       {step === 'status' && confirmedOrder && (
         <div>
-          <div className="glass-panel" style={{ padding: '20px 14px', marginBottom: 16, textAlign: 'center', borderRadius: 14, border: '1px solid rgba(16, 185, 129, 0.3)' }}>
-            <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', margin: '0 auto 10px' }}>
-              ✓
-            </div>
-            <span style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', padding: '3px 10px', borderRadius: 16, fontSize: '0.72rem', fontWeight: 800 }}>
-              PAYMENT CONFIRMED
-            </span>
-            <h1 style={{ fontSize: '1.3rem', fontWeight: 800, marginTop: 8, marginBottom: 4 }}>
-              Booking Confirmed!
-            </h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', margin: '0 auto 12px' }}>
-              Order <code>{confirmedOrder.id}</code> confirmed.
-            </p>
-
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '5px 12px', borderRadius: 6, fontSize: '0.78rem', color: '#34d399' }}>
-              <span>📲</span>
-              <span>Dispatched to WhatsApp: <b>{confirmedOrder.customer_phone}</b></span>
-            </div>
-          </div>
-
-          <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: 12 }}>
-            Digital Entry Passes ({confirmedTickets.length})
-          </h3>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-            {confirmedTickets.map((t, idx) => (
-              <div
-                key={t.id}
-                className="glass-panel"
-                style={{
-                  padding: 14,
-                  borderRadius: 12,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 12,
-                  border: '1px solid var(--border-glass-glow)'
-                }}
-              >
-                <div>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#818cf8', textTransform: 'uppercase' }}>
-                    TICKET #{idx + 1} &nbsp;•&nbsp; {t.tier_name || 'Ticket'}
-                  </span>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginTop: 2, marginBottom: 4 }}>
-                    {t.attendee_name}
-                  </h3>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    Age: <b>{t.attendee_age}</b> &nbsp;•&nbsp; ID: <code>{t.id}</code>
-                  </div>
-
-                  <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <a
-                      href={`/api/client/tickets/${t.id}/png`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="btn btn-primary btn-sm"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none', padding: '5px 10px', fontSize: '0.78rem' }}
-                    >
-                      <span>🖼️</span> View PNG Pass
-                    </a>
-                    <a
-                      href={`/api/client/tickets/${t.id}/pdf`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="btn btn-secondary btn-sm"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none', padding: '5px 10px', fontSize: '0.78rem' }}
-                    >
-                      <span>📥</span> Download PDF
-                    </a>
-                  </div>
-                </div>
-
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ background: '#ffffff', padding: 8, borderRadius: 10, display: 'inline-block' }}>
-                    {qrCodeMap[t.id] ? (
-                      <img src={qrCodeMap[t.id]} alt="Ticket QR Code" style={{ width: 140, height: 140, display: 'block' }} />
-                    ) : (
-                      <div style={{ width: 140, height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000' }}>
-                        Loading...
-                      </div>
-                    )}
-                  </div>
-                </div>
+          {confirmedOrder.payment_status === 'PENDING' ? (
+            <div className="glass-panel" style={{ padding: '24px 18px', marginBottom: 16, textAlign: 'center', borderRadius: 16, border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+              <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', margin: '0 auto 12px' }}>
+                ⏳
               </div>
-            ))}
-          </div>
+              <span style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#93c5fd', padding: '4px 12px', borderRadius: 16, fontSize: '0.74rem', fontWeight: 800 }}>
+                REQUEST PROCESSED • UNDER VERIFICATION
+              </span>
+              <h1 style={{ fontSize: '1.35rem', fontWeight: 800, marginTop: 10, marginBottom: 6 }}>
+                Ticket Request Received!
+              </h1>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: '0 auto 14px', maxWidth: 460 }}>
+                Booking ID <b>{confirmedOrder.id}</b> has been received and is waiting for payment confirmation.
+              </p>
+
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '6px 14px', borderRadius: 8, fontSize: '0.8rem', color: '#93c5fd', marginBottom: 14 }}>
+                <span>📲</span>
+                <span>Confirmation sent to WhatsApp: <b>{confirmedOrder.customer_phone}</b></span>
+              </div>
+
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: 14, borderRadius: 12, border: '1px solid rgba(255, 255, 255, 0.08)', textAlign: 'left', marginTop: 8 }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>What Happens Next?</div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.6' }}>
+                  <li>Our event team checks the bank account to verify your UPI payment.</li>
+                  <li>Once approved, your official entry pass with digital QR code will be dispatched directly to your WhatsApp.</li>
+                  <li>No further action is required from your side.</li>
+                </ul>
+              </div>
+            </div>
+          ) : (
+            <div className="glass-panel" style={{ padding: '20px 14px', marginBottom: 16, textAlign: 'center', borderRadius: 14, border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+              <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', margin: '0 auto 10px' }}>
+                ✓
+              </div>
+              <span style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', padding: '3px 10px', borderRadius: 16, fontSize: '0.72rem', fontWeight: 800 }}>
+                PAYMENT CONFIRMED
+              </span>
+              <h1 style={{ fontSize: '1.3rem', fontWeight: 800, marginTop: 8, marginBottom: 4 }}>
+                Booking Confirmed!
+              </h1>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', margin: '0 auto 12px' }}>
+                Order <code>{confirmedOrder.id}</code> confirmed.
+              </p>
+
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '5px 12px', borderRadius: 6, fontSize: '0.78rem', color: '#34d399' }}>
+                <span>📲</span>
+                <span>Dispatched to WhatsApp: <b>{confirmedOrder.customer_phone}</b></span>
+              </div>
+            </div>
+          )}
+
+          {confirmedTickets.length > 0 ? (
+            <div>
+              <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: 12 }}>
+                Digital Entry Passes ({confirmedTickets.length})
+              </h3>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+                {confirmedTickets.map((t, idx) => (
+                  <div
+                    key={t.id}
+                    className="glass-panel"
+                    style={{
+                      padding: 14,
+                      borderRadius: 12,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                      border: '1px solid var(--border-glass-glow)'
+                    }}
+                  >
+                    <div>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#818cf8', textTransform: 'uppercase' }}>
+                        TICKET #{idx + 1} &nbsp;•&nbsp; {t.tier_name || 'Ticket'}
+                      </span>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginTop: 2, marginBottom: 4 }}>
+                        {t.attendee_name}
+                      </h3>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        Age: <b>{t.attendee_age}</b> &nbsp;•&nbsp; ID: <code>{t.id}</code>
+                      </div>
+
+                      <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <a
+                          href={`/api/client/tickets/${t.id}/png`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-primary btn-sm"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none', padding: '5px 10px', fontSize: '0.78rem' }}
+                        >
+                          <span>🖼️</span> View PNG Pass
+                        </a>
+                        <a
+                          href={`/api/client/tickets/${t.id}/pdf`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-secondary btn-sm"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none', padding: '5px 10px', fontSize: '0.78rem' }}
+                        >
+                          <span>📥</span> Download PDF
+                        </a>
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ background: '#ffffff', padding: 8, borderRadius: 10, display: 'inline-block' }}>
+                        {qrCodeMap[t.id] ? (
+                          <img src={qrCodeMap[t.id]} alt="Ticket QR Code" style={{ width: 140, height: 140, display: 'block' }} />
+                        ) : (
+                          <div style={{ width: 140, height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000' }}>
+                            Loading...
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="glass-panel" style={{ padding: 16, borderRadius: 12, marginBottom: 20 }}>
+              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f8fafc', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>👥</span>
+                <span>Registered Attendees ({attendees.length || 1})</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {attendees.map((att, i) => (
+                  <div key={att.id || i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#cbd5e1', padding: '6px 10px', background: 'rgba(255,255,255,0.02)', borderRadius: 6 }}>
+                    <span><b>#{i + 1}</b> {att.name || 'Guest'} (Age: {att.age || '18'})</span>
+                    <span style={{ color: '#818cf8', fontWeight: 600 }}>{att.tierName || 'Pass'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
             <Link href="/wallet" className="btn btn-primary btn-sm" style={{ textDecoration: 'none', fontSize: '0.8rem' }}>

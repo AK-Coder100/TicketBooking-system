@@ -31,6 +31,14 @@ export async function GET() {
       LIMIT 12
     `).all();
 
+    const pendingOrders = await db.prepare(`
+      SELECT o.*, t.name as tenant_name, t.slug as tenant_slug 
+      FROM orders o
+      JOIN tenants t ON o.tenant_id = t.id
+      WHERE o.payment_status = 'PENDING'
+      ORDER BY o.created_at DESC
+    `).all();
+
     const settingRows: any[] = await db.prepare('SELECT key, value FROM platform_settings').all();
     const settings: Record<string, string> = {};
     for (const r of settingRows) {
@@ -54,6 +62,7 @@ export async function GET() {
         activeGateway: settings.active_gateway || 'UPI'
       },
       recentOrders,
+      pendingOrders,
       settings
     });
   } catch (err: any) {

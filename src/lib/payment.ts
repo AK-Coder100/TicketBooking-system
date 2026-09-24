@@ -132,7 +132,7 @@ export class UpiAdapter {
         : undefined;
 
     const payeeName = tenantName || undefined;
-    const note = `Order ${orderId}${eventTitle ? ` - ${eventTitle}` : ''}`.slice(0, 50);
+    const note = `Booking ${orderId}${eventTitle ? ` - ${eventTitle}` : ''}`.slice(0, 50);
 
     const session: UpiSession = await createPaymentSession({
       amount: amountRupees,

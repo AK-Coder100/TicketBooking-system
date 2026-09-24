@@ -74,9 +74,9 @@ export function generateUpiLink(params = {}) {
   const payeeVpa = params.payeeVpa || getMerchantUpiId();
   const payeeName = params.payeeName || getMerchantName();
   const orderId = params.orderId ? String(params.orderId).trim() : generateOrderId();
-  
+
   // Clean alphanumeric note with order ID, max 50 chars for universal UPI app compatibility
-  const note = (params.note || `Order ${orderId}`).trim().slice(0, 50);
+  const note = (params.note || `Booking ${orderId}`).trim().slice(0, 50);
   const currency = params.currency || 'INR';
   const mcc = params.mcc || process.env.MERCHANT_MCC || '5411';
 

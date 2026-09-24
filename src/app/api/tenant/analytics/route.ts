@@ -50,6 +50,17 @@ export async function GET(request: NextRequest) {
       LIMIT 30
     `).all(tenantId);
 
+    const pendingOrders: any[] = await db.prepare(`
+      SELECT o.*, t.name as tenant_name, t.slug as tenant_slug,
+             COALESCE(e.title, o.event_title, 'General Event') as display_event_title
+      FROM orders o
+      JOIN tenants t ON o.tenant_id = t.id
+      LEFT JOIN ticket_tiers tt ON o.tier_id = tt.id
+      LEFT JOIN events e ON tt.event_id = e.id
+      WHERE o.tenant_id = ? AND o.payment_status = 'PENDING'
+      ORDER BY o.created_at DESC
+    `).all(tenantId);
+
     return NextResponse.json({
       success: true,
       stats: {
@@ -57,10 +68,12 @@ export async function GET(request: NextRequest) {
         checkedInCount,
         checkinPercentage,
         grossRevenuePaise,
-        grossRevenueRupees: (grossRevenuePaise / 100).toFixed(2)
+        grossRevenueRupees: (grossRevenuePaise / 100).toFixed(2),
+        pendingRequestsCount: pendingOrders.length
       },
       attendees,
-      auditLogs
+      auditLogs,
+      pendingOrders
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

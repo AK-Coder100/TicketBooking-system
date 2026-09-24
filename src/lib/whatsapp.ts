@@ -311,3 +311,115 @@ export async function sendWhatsAppTicketMessage({
     error: errorDetail
   };
 }
+
+export async function sendWhatsAppTextMessage({
+  toPhone,
+  messageText
+}: {
+  toPhone: string;
+  messageText: string;
+}) {
+  const isEnabled = process.env.WHATSAPP_ENABLED === 'true';
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN || '';
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+
+  let recipientPhone = toPhone.replace(/[^0-9]/g, '');
+  if (recipientPhone.length === 10) recipientPhone = `91${recipientPhone}`;
+
+  if (!isEnabled || !accessToken || !phoneNumberId) {
+    console.log(`[WhatsApp Simulated Text to ${recipientPhone}]:\n${messageText}`);
+    return { success: true, simulated: true };
+  }
+
+  try {
+    const payload = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: recipientPhone,
+      type: 'text',
+      text: {
+        preview_url: false,
+        body: messageText
+      }
+    };
+
+    const res = await fetch(`https://graph.facebook.com/v22.0/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const json = await res.json();
+    console.log('[WhatsApp Text API response]:', JSON.stringify(json));
+    return { success: res.ok, data: json };
+  } catch (err: any) {
+    console.error('[WhatsApp Text Error]:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendWhatsAppOrderProcessedMessage({
+  orderId,
+  toPhone,
+  customerName,
+  eventTitle,
+  amount,
+  utr
+}: {
+  orderId: string;
+  toPhone: string;
+  customerName?: string;
+  eventTitle?: string;
+  amount?: string | number;
+  utr?: string;
+}) {
+  const name = customerName || 'Valued Attendee';
+  const event = eventTitle || 'Your Event';
+  const utrLine = utr ? `\n• *UPI Ref / UTR:* ${utr}` : '';
+  const amountLine = amount ? `\n• *Amount:* ₹${amount}` : '';
+
+  const messageText = 
+`🎟️ *Ticket Request Received!*
+
+Hi ${name}, your booking request for *${event}* has been processed!
+
+• *Booking ID:* ${orderId}${amountLine}${utrLine}
+• *Status:* ⏳ Pending Organizer Verification
+
+Our team is verifying your payment with the bank. Once confirmed, your official entry pass with digital QR code will be dispatched here directly on WhatsApp.
+
+Thank you!`;
+
+  return sendWhatsAppTextMessage({ toPhone, messageText });
+}
+
+export async function sendWhatsAppOrderDeclinedMessage({
+  orderId,
+  toPhone,
+  customerName,
+  eventTitle
+}: {
+  orderId: string;
+  toPhone: string;
+  customerName?: string;
+  eventTitle?: string;
+}) {
+  const name = customerName || 'Valued Attendee';
+  const event = eventTitle || 'Your Event';
+
+  const messageText = 
+`⚠️ *Ticket Request Update*
+
+Hi ${name}, we could not verify the payment for your booking request:
+
+• *Booking ID:* ${orderId}
+• *Event:* ${event}
+• *Status:* Declined
+
+If you have already paid or believe this is an error, please reach out to event support with your payment receipt and UTR reference number.`;
+
+  return sendWhatsAppTextMessage({ toPhone, messageText });
+}

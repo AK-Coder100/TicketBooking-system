@@ -98,7 +98,8 @@ export async function POST(request: NextRequest) {
       platformSettings
     });
 
-    const orderId = `ord_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    // Generate clean readable Booking ID (e.g. BK-849201-145)
+    const orderId = `BK-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
     const now = new Date().toISOString();
 
     // Check or create customer
@@ -118,12 +119,12 @@ export async function POST(request: NextRequest) {
       `).run(generalUserId, finalCustomerName, placeholderEmail, customerPhone, now);
     }
 
-    // Insert pending order
+    // Insert pending order with persisted attendee records for later admin approval
     await db.prepare(`
       INSERT INTO orders (id, tenant_id, user_id, customer_name, customer_phone, customer_email,
                           total_base_price, platform_fee, convenience_fee, total_charged,
-                          payment_status, gateway_type, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)
+                          payment_status, gateway_type, attendees_data, tier_id, event_title, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?)
     `).run(
       orderId,
       primaryTier.tenant_id,
@@ -136,6 +137,9 @@ export async function POST(request: NextRequest) {
       breakdown.convenienceFeePaise,
       breakdown.totalChargedPaise,
       activeGateway,
+      JSON.stringify(attendeeList),
+      primaryTier.id,
+      primaryTier.event_title || null,
       now
     );
 
