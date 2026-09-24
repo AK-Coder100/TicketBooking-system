@@ -1569,13 +1569,32 @@ function OrganizerDashboardInner() {
                         </div>
 
                         <div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: 3 }}>
+                            UPI Parameters (<span style={{ color: '#38bdf8' }}>tr</span> &amp; <span style={{ color: '#fbbf24' }}>tn</span>)
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <div style={{ fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '1px 5px', borderRadius: 4, fontFamily: 'monospace', fontWeight: 800, fontSize: '0.68rem' }}>tr</span>
+                              <code style={{ color: '#38bdf8', fontWeight: 700 }}>{order.id}</code>
+                            </div>
+                            <div style={{ fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', padding: '1px 5px', borderRadius: 4, fontFamily: 'monospace', fontWeight: 800, fontSize: '0.68rem' }}>tn</span>
+                              <code style={{ color: '#fbbf24', fontWeight: 700, maxWidth: 190, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`Booking ${order.id}${order.display_event_title || order.event_title ? ` - ${order.display_event_title || order.event_title}` : ''}`}>
+                                Booking {order.id}{order.display_event_title || order.event_title ? ` - ${order.display_event_title || order.event_title}` : ''}
+                              </code>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
                           <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: 3 }}>Submitted UTR / Transaction Ref</div>
                           <div style={{
                             fontFamily: 'monospace',
                             fontWeight: 800,
                             fontSize: '0.92rem',
-                            color: '#fbbf24',
-                            background: 'rgba(245, 158, 11, 0.12)',
+                            color: '#34d399',
+                            background: 'rgba(16, 185, 129, 0.12)',
+                            border: '1px solid rgba(16, 185, 129, 0.25)',
                             padding: '5px 10px',
                             borderRadius: 6,
                             display: 'inline-block'
@@ -2210,6 +2229,16 @@ function OrganizerDashboardInner() {
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span style={{ color: '#94a3b8' }}>Amount to Verify:</span>
                 <span style={{ fontWeight: 800, color: '#34d399' }}>{orderActionModal.amountFormatted}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ color: '#94a3b8' }}>UPI Ref (tr):</span>
+                <code style={{ color: '#38bdf8', fontWeight: 700 }}>{orderActionModal.orderId}</code>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ color: '#94a3b8' }}>Payment Note (tn):</span>
+                <code style={{ color: '#fbbf24', fontWeight: 700, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  Booking {orderActionModal.orderId}{orderActionModal.eventTitle ? ` - ${orderActionModal.eventTitle}` : ''}
+                </code>
               </div>
               {orderActionModal.eventTitle && (
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>

@@ -6,6 +6,9 @@ import {
 
 export interface UpiSession {
   orderId: string;
+  tr?: string;
+  note?: string;
+  tn?: string;
   amount: number;
   currency: string;
   merchantUpiId: string;
@@ -157,6 +160,9 @@ export class UpiAdapter {
       merchantName: session.merchantName,
       amountPaise,
       currency: currency || 'INR',
+      tr: session.orderId,
+      tn: note,
+      note,
       superAdminCutPaise: splitDetails.platformFeePaise,
       organizerNetSharePaise: splitDetails.organizerNetPayoutPaise
     };

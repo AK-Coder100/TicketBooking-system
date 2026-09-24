@@ -185,6 +185,7 @@ export async function initSchema(): Promise<void> {
         payment_status VARCHAR(20) DEFAULT 'PENDING',
         gateway_order_id VARCHAR(255),
         gateway_payment_id VARCHAR(255),
+        payment_reference TEXT,
         gateway_type VARCHAR(20) DEFAULT 'UPI',
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
@@ -220,6 +221,7 @@ export async function initSchema(): Promise<void> {
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS attendees_data TEXT;
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS tier_id VARCHAR(100);
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS event_title VARCHAR(255);
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_reference TEXT;
     `);
 
     await seedData();

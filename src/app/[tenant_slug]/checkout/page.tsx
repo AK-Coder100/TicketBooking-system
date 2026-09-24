@@ -50,6 +50,15 @@ export default function TenantCheckoutPage() {
   const [confirmedOrder, setConfirmedOrder] = useState<any>(null);
   const [confirmedTickets, setConfirmedTickets] = useState<any[]>([]);
   const [qrCodeMap, setQrCodeMap] = useState<Record<string, string>>({});
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const handleCopy = (text: string, fieldName: string) => {
+    try {
+      navigator.clipboard.writeText(text);
+      setCopiedField(fieldName);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch (e) {}
+  };
   const [loading, setLoading] = useState(false);
   const [enteredUtr, setEnteredUtr] = useState('');
   const [copiedUpi, setCopiedUpi] = useState(false);
@@ -705,7 +714,9 @@ export default function TenantCheckoutPage() {
       {showPaymentModal && pendingOrder && (() => {
         const upiData = pendingOrder.upiSession || pendingOrder.gatewayOrder?.upiSession || pendingOrder.gatewayOrder || {};
         const upiId = upiData.merchantUpiId || 'BHARATPE.8J0S0Z9W9S44900@FBPE';
-        const upiLink = upiData.upiLink || `upi://pay?pa=${encodeURIComponent(upiId)}&pn=Tickets&tr=${encodeURIComponent(pendingOrder.orderId)}&tn=${encodeURIComponent('Order ' + pendingOrder.orderId)}&am=${(pendingOrder.breakdown.totalChargedPaise / 100).toFixed(2)}&cu=INR&mode=02`;
+        const trValue = pendingOrder.orderId;
+        const tnValue = upiData.note || ('Booking ' + pendingOrder.orderId + (selectedEvent?.title ? ' - ' + selectedEvent.title : ''));
+        const upiLink = upiData.upiLink || `upi://pay?pa=${encodeURIComponent(upiId)}&pn=Tickets&tr=${encodeURIComponent(trValue)}&tn=${encodeURIComponent(tnValue)}&am=${(pendingOrder.breakdown.totalChargedPaise / 100).toFixed(2)}&cu=INR&mode=02`;
         const appLinks = upiData.appLinks || {};
 
         return (
@@ -751,12 +762,103 @@ export default function TenantCheckoutPage() {
                 )}
 
                 {/* Amount Display */}
-                <div style={{ textAlign: 'center', marginBottom: 14, background: 'rgba(255, 255, 255, 0.03)', padding: '10px 14px', borderRadius: 12, border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                <div style={{ textAlign: 'center', marginBottom: 12, background: 'rgba(255, 255, 255, 0.03)', padding: '10px 14px', borderRadius: 12, border: '1px solid rgba(255, 255, 255, 0.06)' }}>
                   <div style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Amount to Pay</div>
                   <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#34d399', margin: '2px 0' }}>
                     ₹{(pendingOrder.breakdown.totalChargedPaise / 100).toFixed(2)}
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Order Ref: <code style={{ color: '#cbd5e1' }}>{pendingOrder.orderId}</code></div>
+                </div>
+
+                {/* Prominent tr & tn Reference Box */}
+                <div style={{
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  background: 'rgba(15, 23, 42, 0.75)',
+                  border: '1px solid rgba(99, 102, 241, 0.35)',
+                  marginBottom: 14,
+                  fontSize: '0.8rem'
+                }}>
+                  {/* tr row */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{
+                        background: 'rgba(56, 189, 248, 0.18)',
+                        color: '#38bdf8',
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        fontSize: '0.7rem',
+                        fontWeight: 800,
+                        fontFamily: 'monospace'
+                      }}>
+                        tr
+                      </span>
+                      <span style={{ color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 600 }}>
+                        Order / Transaction Ref:
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <code style={{ color: '#38bdf8', fontWeight: 700, fontFamily: 'monospace', fontSize: '0.82rem' }}>
+                        {trValue}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(trValue, 'tr')}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.08)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          color: copiedField === 'tr' ? '#34d399' : '#cbd5e1',
+                          borderRadius: 4,
+                          padding: '2px 8px',
+                          fontSize: '0.68rem',
+                          cursor: 'pointer',
+                          fontWeight: 700
+                        }}
+                      >
+                        {copiedField === 'tr' ? '✓ Copied' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* tn row */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{
+                        background: 'rgba(245, 158, 11, 0.18)',
+                        color: '#fbbf24',
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        fontSize: '0.7rem',
+                        fontWeight: 800,
+                        fontFamily: 'monospace'
+                      }}>
+                        tn
+                      </span>
+                      <span style={{ color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 600 }}>
+                        Transaction Note:
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <code style={{ color: '#fbbf24', fontWeight: 700, fontFamily: 'monospace', fontSize: '0.78rem', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tnValue}>
+                        {tnValue}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(tnValue, 'tn')}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.08)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          color: copiedField === 'tn' ? '#34d399' : '#cbd5e1',
+                          borderRadius: 4,
+                          padding: '2px 8px',
+                          fontSize: '0.68rem',
+                          cursor: 'pointer',
+                          fontWeight: 700
+                        }}
+                      >
+                        {copiedField === 'tn' ? '✓ Copied' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* QR Code Section */}
@@ -958,9 +1060,19 @@ export default function TenantCheckoutPage() {
               <h1 style={{ fontSize: '1.35rem', fontWeight: 800, marginTop: 10, marginBottom: 6 }}>
                 Ticket Request Received!
               </h1>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: '0 auto 14px', maxWidth: 460 }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: '0 auto 10px', maxWidth: 460 }}>
                 Booking ID <b>{confirmedOrder.id}</b> has been received and is waiting for payment confirmation.
               </p>
+
+              {/* tr & tn Badges */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                <span style={{ background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.3)', color: '#38bdf8', padding: '3px 10px', borderRadius: 6, fontSize: '0.74rem', fontFamily: 'monospace' }}>
+                  <b>tr:</b> {confirmedOrder.id}
+                </span>
+                <span style={{ background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#fbbf24', padding: '3px 10px', borderRadius: 6, fontSize: '0.74rem', fontFamily: 'monospace' }}>
+                  <b>tn:</b> Booking {confirmedOrder.id}{confirmedOrder.event_title ? ` - ${confirmedOrder.event_title}` : ''}
+                </span>
+              </div>
 
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '6px 14px', borderRadius: 8, fontSize: '0.8rem', color: '#93c5fd', marginBottom: 14 }}>
                 <span>📲</span>

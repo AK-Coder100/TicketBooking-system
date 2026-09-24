@@ -148,8 +148,13 @@ export async function createPaymentSession(params = {}) {
   const expiresInMinutes = params.expiresInMinutes || 15;
   const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000).toISOString();
 
+  const note = (params.note || `Booking ${orderId}`).trim().slice(0, 50);
+
   return {
     orderId,
+    tr: orderId,
+    note,
+    tn: note,
     amount,
     currency: params.currency || 'INR',
     merchantUpiId: params.payeeVpa || getMerchantUpiId(),

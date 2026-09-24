@@ -50,7 +50,7 @@ export async function POST(
     await db.prepare(`
       UPDATE orders
       SET payment_status = 'PAID',
-          payment_reference = COALESCE(payment_reference, 'CONFIRMED_BY_ORGANIZER')
+          gateway_payment_id = COALESCE(gateway_payment_id, 'CONFIRMED_BY_ORGANIZER')
       WHERE id = ?
     `).run(orderId);
 
