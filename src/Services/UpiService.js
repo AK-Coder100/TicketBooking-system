@@ -11,7 +11,7 @@ import QRCode from 'qrcode';
 // ──────────────────────────────────────────────────────────────────────────
 
 export function getMerchantUpiId(override) {
-  return override || process.env.MERCHANT_UPI_ID || 'BHARATPE.8J0S0Z9W9S44900@FBPE';
+  return override || process.env.MERCHANT_UPI_ID;
 }
 
 export function getMerchantName(override) {

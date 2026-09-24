@@ -57,7 +57,7 @@ export default function TenantCheckoutPage() {
       navigator.clipboard.writeText(text);
       setCopiedField(fieldName);
       setTimeout(() => setCopiedField(null), 2000);
-    } catch (e) {}
+    } catch (e) { }
   };
   const [loading, setLoading] = useState(false);
   const [enteredUtr, setEnteredUtr] = useState('');
@@ -713,7 +713,7 @@ export default function TenantCheckoutPage() {
       {/* UPI PAYMENT MODAL */}
       {showPaymentModal && pendingOrder && (() => {
         const upiData = pendingOrder.upiSession || pendingOrder.gatewayOrder?.upiSession || pendingOrder.gatewayOrder || {};
-        const upiId = upiData.merchantUpiId || 'BHARATPE.8J0S0Z9W9S44900@FBPE';
+        const upiId = upiData.merchantUpiId;
         const trValue = pendingOrder.orderId;
         const tnValue = upiData.note || ('Booking ' + pendingOrder.orderId + (selectedEvent?.title ? ' - ' + selectedEvent.title : ''));
         const upiLink = upiData.upiLink || `upi://pay?pa=${encodeURIComponent(upiId)}&pn=Tickets&tr=${encodeURIComponent(trValue)}&tn=${encodeURIComponent(tnValue)}&am=${(pendingOrder.breakdown.totalChargedPaise / 100).toFixed(2)}&cu=INR&mode=02`;
