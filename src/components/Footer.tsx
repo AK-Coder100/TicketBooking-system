@@ -14,7 +14,7 @@ export default function Footer() {
     }}>
       <div style={{ maxWidth: 1120, margin: '0 auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 30, marginBottom: 30 }}>
-          
+
           {/* Column 1: Brand & Merchant Legal Identity */}
           <div>
             <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -66,7 +66,7 @@ export default function Footer() {
           </div>
 
           {/* Column 3: Quick Portals */}
-          <div>
+          {/* <div>
             <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>
               Quick Links
             </div>
@@ -92,7 +92,7 @@ export default function Footer() {
                 </Link>
               </li>
             </ul>
-          </div>
+          </div> */}
 
           {/* Column 4: Merchant Contact & Venue */}
           <div>

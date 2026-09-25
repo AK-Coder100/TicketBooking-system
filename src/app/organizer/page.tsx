@@ -387,7 +387,7 @@ function OrganizerDashboardInner() {
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
         osc.start(); osc.stop(ctx.currentTime + 0.4);
       }
-    } catch (_) {}
+    } catch (_) { }
   };
 
   // ── Scanner Logic ───────────────────────────────────────────────────────────
@@ -581,7 +581,7 @@ function OrganizerDashboardInner() {
   const activeEvent = events.find(e => e.id === selectedEventId) || events[0] || null;
   const totalSessionsCount = events.reduce((acc, ev) => acc + (ev.sessions?.length || ev.session_count || 1), 0);
   const activeSessionName = activeEvent?.sessions?.[0]?.name || 'Day 1 Grand Opening';
-  
+
   const totalConfirmedTickets = stats.totalTickets ?? (attendees.length > 0 ? attendees.length : 248);
   const totalCheckedIn = stats.checkedInCount ?? attendees.filter(a => parseInt(a.checkin_count || '0', 10) > 0).length;
   const admittedPct = totalConfirmedTickets > 0 ? ((totalCheckedIn / totalConfirmedTickets) * 100).toFixed(1) : '45.2';
@@ -597,8 +597,8 @@ function OrganizerDashboardInner() {
 
   // Gross revenue calculation
   const grossValNum = parseFloat(stats.grossRevenueRupees || '184000');
-  const grossFormatted = grossValNum >= 100000 
-    ? `₹${(grossValNum / 100000).toFixed(2)}L` 
+  const grossFormatted = grossValNum >= 100000
+    ? `₹${(grossValNum / 100000).toFixed(2)}L`
     : `₹${grossValNum.toLocaleString('en-IN')}`;
 
   const tenantName = userProfile?.tenant?.name || 'SR Production & RB Garment Enterprises';
@@ -701,7 +701,7 @@ function OrganizerDashboardInner() {
               }}
             >
               <span>🔔</span>
-              <span>{pendingOrders.length} Pending</span>
+              <span>{pendingOrders.length}</span>
             </button>
           )}
           {userProfile?.allTenants && userProfile.allTenants.length > 1 && (
@@ -1466,7 +1466,7 @@ function OrganizerDashboardInner() {
                     if (order.attendees_data) {
                       attendeesList = JSON.parse(order.attendees_data);
                     }
-                  } catch (e) {}
+                  } catch (e) { }
 
                   const utrText = order.gateway_payment_id || order.payment_reference || 'Self-reported by customer';
 
@@ -1694,7 +1694,7 @@ function OrganizerDashboardInner() {
                 <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>My Organization Events</h2>
                 <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: 3 }}>Manage public listings, sessions, and ticket pricing.</p>
               </div>
-              {userProfile?.canCreateEvents !== false ? (
+              {/* {userProfile?.canCreateEvents !== false ? (
                 <button
                   className="btn btn-primary"
                   onClick={openModal}
@@ -1706,7 +1706,7 @@ function OrganizerDashboardInner() {
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', padding: '6px 12px', borderRadius: 10, fontSize: '0.78rem', color: '#fbbf24' }}>
                   🔒 Event Creation Restricted for your Profile ({userProfile?.tenantRole || 'Staff'})
                 </div>
-              )}
+              )} */}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
@@ -2121,7 +2121,7 @@ function OrganizerDashboardInner() {
         </button>
 
         {/* Nav 5: Profile */}
-        <button
+        {/* <button
           type="button"
           onClick={() => switchTab('profile')}
           style={{
@@ -2142,7 +2142,7 @@ function OrganizerDashboardInner() {
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
           Profile
-        </button>
+        </button> */}
       </nav>
 
       {/* ════════════════════════════════════════════════════════════════════

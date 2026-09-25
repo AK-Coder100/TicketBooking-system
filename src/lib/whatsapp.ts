@@ -26,10 +26,6 @@ function getSystemBaseUrl(): string {
  * On localhost it will fall back to the direct media-upload path instead.
  */
 function getWhatsAppBaseUrl(): string {
-  // Highest priority: explicit WhatsApp public URL
-  if (process.env.WHATSAPP_PUBLIC_BASE_URL) {
-    return process.env.WHATSAPP_PUBLIC_BASE_URL.replace(/\/$/, '');
-  }
   return getSystemBaseUrl();
 }
 
@@ -73,6 +69,15 @@ async function uploadTicketImageToMeta(
   }
 }
 
+function normalizePhoneForService(rawPhone: string): string {
+  let cleaned = (rawPhone || '').replace(/[^0-9]/g, '');
+  if (cleaned.length === 10) {
+    const prefix = process.env.WHATSAPP_PHONE_PREFIX || '0';
+    return `${prefix}${cleaned}`;
+  }
+  return cleaned;
+}
+
 // ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
@@ -106,20 +111,10 @@ export async function sendWhatsAppTicketMessage({
 
   // ── Phone normalisation ───────────────────────────────────────────────────
   const rawPhone = toPhone || ticket.customer_phone || '';
-  let recipientPhone = rawPhone.replace(/[^0-9]/g, '');
-  if (recipientPhone.length === 10) {
-    recipientPhone = `91${recipientPhone}`;
-  }
+  const recipientPhone = normalizePhoneForService(rawPhone);
   if (!recipientPhone) {
     throw new Error('Recipient phone number is missing or invalid');
   }
-
-  // ── Config ────────────────────────────────────────────────────────────────
-  const isEnabled   = process.env.WHATSAPP_ENABLED === 'true';
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN || '';
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
-  const templateName  = process.env.WHATSAPP_TEMPLATE_NAME || 'purchase_receipt_1';
-  const templateLang  = process.env.WHATSAPP_TEMPLATE_LANGUAGE || 'en_US';
 
   const baseUrl      = getWhatsAppBaseUrl();
   const pngTicketUrl = `${baseUrl}/api/client/tickets/${ticketId}/png`;
@@ -130,155 +125,84 @@ export async function sendWhatsAppTicketMessage({
   const startDate = ticket.start_date ? new Date(ticket.start_date) : null;
   const endDate   = ticket.end_date   ? new Date(ticket.end_date)   : null;
 
-  // {{1}} DATE
-  const dateParam =
-    ticket.valid_date && ticket.valid_date !== 'ALL_DAYS'
-      ? ticket.valid_date
-      : startDate && !isNaN(startDate.getTime())
-        ? startDate.toLocaleDateString('en-IN', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric'
-          })
-        : 'TBA';
+  // Format Date (e.g. "15 TO 19 OCT 2026" or "15 OCT 2026")
+  let dateParam = 'TBA';
+  if (ticket.valid_date && ticket.valid_date !== 'ALL_DAYS') {
+    dateParam = ticket.valid_date.toUpperCase();
+  } else if (startDate && !isNaN(startDate.getTime())) {
+    if (endDate && !isNaN(endDate.getTime()) && startDate.toDateString() !== endDate.toDateString()) {
+      const startDay = startDate.getDate();
+      const endDay = endDate.getDate();
+      const endMonthYear = endDate.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }).toUpperCase();
+      dateParam = `${startDay} TO ${endDay} ${endMonthYear}`;
+    } else {
+      dateParam = startDate.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      }).toUpperCase();
+    }
+  }
 
-  // {{2}} TIME  (e.g. "7:00 PM – 11:30 PM")
+  // Format Time (e.g. "7:00 PM – 11:30 PM")
   const fmtTime = (d: Date) =>
-    d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase();
   const timeParam =
     startDate && !isNaN(startDate.getTime())
-      ? endDate && !isNaN(endDate.getTime())
+      ? endDate && !isNaN(endDate.getTime()) && fmtTime(startDate) !== fmtTime(endDate)
         ? `${fmtTime(startDate)} – ${fmtTime(endDate)}`
         : fmtTime(startDate)
-      : 'TBA';
+      : '7:00 PM – 11:30 PM';
 
-  // {{3}} VENUE
-  const venueParam = ticket.event_location || 'TBA';
+  const venueParam = ticket.event_location || 'Kacheri Club, Town Hall, Gorakhpur';
+  const tierParam = (ticket.tier_name || 'GENERAL ADMISSION').toUpperCase();
 
-  // {{4}} TICKET (tier name)
-  const tierParam = (ticket.tier_name || 'General Admission').toUpperCase();
-
-  // ── Dispatch ──────────────────────────────────────────────────────────────
+  // ── Dispatch via WhatsApp Microservice (/api/send-ticket) ──────────────────
   let dispatchStatus = 'SIMULATED';
   let errorDetail: string | null = null;
-  let mediaIdUsed: string | null = null;
 
-  if (!isEnabled) {
-    errorDetail = 'WHATSAPP_ENABLED is set to false in .env';
-  } else if (!accessToken) {
-    errorDetail = 'WHATSAPP_ACCESS_TOKEN is missing in .env';
-  } else if (!phoneNumberId) {
-    errorDetail =
-      'WHATSAPP_PHONE_NUMBER_ID is missing in .env. Copy the 15-digit Phone Number ID from Meta Developer Console → WhatsApp → API Setup.';
-    dispatchStatus = 'FAILED';
-  } else {
-    try {
-      // ── Resolve image header parameter ──────────────────────────────────
-      //  Meta's servers cannot reach localhost URLs.
-      //  When running locally: upload the PNG directly via Media API → use media_id.
-      //  When on a public server: pass the public URL directly.
-      let headerImageParam: Record<string, any> | null = null;
+  const ticketServiceUrl = `${process.env.WHATSAPP_SERVICE_BASE_URL || 'http://localhost:8000'}/api/send-ticket`;
 
-      if (templateName !== 'hello_world') {
-        if (isLocalhostUrl(pngTicketUrl)) {
-          // Fetch the PNG from our own local server first, then upload to Meta
-          console.log('[WhatsApp] BASE_URL is localhost – attempting direct media upload to Meta...');
-          try {
-            const localRes = await fetch(pngTicketUrl);
-            if (localRes.ok) {
-              const pngBuffer = Buffer.from(await localRes.arrayBuffer());
-              const uploadedId = await uploadTicketImageToMeta(pngBuffer, phoneNumberId, accessToken);
-              if (uploadedId) {
-                mediaIdUsed = uploadedId;
-                headerImageParam = { type: 'image', image: { id: uploadedId } };
-              } else {
-                console.warn('[WhatsApp] Media upload returned no id – sending body-only message.');
-              }
-            } else {
-              console.warn('[WhatsApp] Could not fetch local PNG:', localRes.status, localRes.statusText);
-            }
-          } catch (fetchErr) {
-            console.warn('[WhatsApp] Local PNG fetch failed:', fetchErr);
-          }
-        } else {
-          // Public URL – pass directly
-          headerImageParam = { type: 'image', image: { link: pngTicketUrl } };
-        }
-      }
+  const disclaimerCaption =
+`🎟️ Ticket Booking Confirmed!\n\nYour ticket has been successfully booked.\n⚠️ Disclaimer: The event is solely organized and managed by the Event Organizer. In case of cancellation, postponement, rescheduling, venue change, refund, or any other event-related issue, the Organizer shall be solely responsible. Our website/platform acts only as a ticketing/booking platform and shall not be held responsible or liable for such matters.\n\nThank you.`;
 
-      // ── Build template payload ──────────────────────────────────────────
-      // Template purchase_receipt_1 has a fixed body (0 body variables).
-      // Only the header image component is needed.
-      const components: any[] = [];
+  const ticketPayload = {
+    phone: recipientPhone,
+    ticket_id: ticket.id,
+    attendee_name: ticket.attendee_name || ticket.customer_name || 'Valued Attendee',
+    ticket_type: tierParam,
+    venue: venueParam,
+    date: dateParam,
+    time: timeParam,
+    qr_data: ticket.qr_secret_token || ticket.id,
+    caption: disclaimerCaption
+  };
 
-      if (headerImageParam) {
-        components.push({
-          type: 'header',
-          parameters: [headerImageParam]
-        });
-      }
+  try {
+    console.log(`[WhatsApp Ticket Service] Calling ${ticketServiceUrl}:`, JSON.stringify(ticketPayload, null, 2));
 
-      const payload: any = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: recipientPhone,
-        type: 'template',
-        template: {
-          name: templateName,
-          language: { code: templateLang },
-          ...(templateName !== 'hello_world' && { components })
-        }
-      };
+    const res = await fetch(ticketServiceUrl, {
+      method: 'POST',
+      headers: {
+        'accept': '*/*',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(ticketPayload)
+    });
 
-      console.log('[WhatsApp] Sending payload to Meta:', JSON.stringify(payload, null, 2));
+    const json = await res.json().catch(() => null);
+    console.log(`[WhatsApp Ticket API Response ${res.status}]:`, json);
 
-      let metaRes = await fetch(
-        `https://graph.facebook.com/v22.0/${phoneNumberId}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        }
-      );
-
-      let metaJson = await metaRes.json();
-      console.log('[WhatsApp] Meta API response:', JSON.stringify(metaJson));
-
-      // Fallback: template still PENDING approval (132001) → send hello_world
-      if (!metaRes.ok && metaJson.error?.code === 132001 && templateName !== 'hello_world') {
-        console.warn(`[WhatsApp] Template "${templateName}" is PENDING approval. Falling back to hello_world...`);
-        const fallbackPayload = {
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: recipientPhone,
-          type: 'template',
-          template: { name: 'hello_world', language: { code: 'en_US' } }
-        };
-        metaRes  = await fetch(`https://graph.facebook.com/v22.0/${phoneNumberId}/messages`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(fallbackPayload)
-        });
-        metaJson = await metaRes.json();
-        console.log('[WhatsApp] Fallback hello_world response:', JSON.stringify(metaJson));
-      }
-
-      if (metaRes.ok && metaJson.messages?.[0]?.id) {
-        dispatchStatus = 'DELIVERED';
-      } else {
-        dispatchStatus = 'FAILED';
-        errorDetail =
-          metaJson.error?.message || JSON.stringify(metaJson.error || metaJson);
-        console.error('[WhatsApp] Meta API Error:', metaJson);
-      }
-    } catch (err: any) {
+    if (res.ok && json?.success !== false) {
+      dispatchStatus = 'DELIVERED';
+    } else {
       dispatchStatus = 'FAILED';
-      errorDetail = err.message;
-      console.error('[WhatsApp] Dispatch exception:', err);
+      errorDetail = json?.detail || json?.message || 'Failed to dispatch ticket via WhatsApp service';
     }
+  } catch (err: any) {
+    console.error('[WhatsApp Ticket Service Exception]:', err);
+    dispatchStatus = 'FAILED';
+    errorDetail = err.message;
   }
 
   // ── Audit log ─────────────────────────────────────────────────────────────
@@ -295,9 +219,7 @@ export async function sendWhatsAppTicketMessage({
       recipientName: ticket.customer_name,
       dispatchStatus,
       pngTicketUrl,
-      mediaIdUsed,
-      template: templateName,
-      bodyParams: { date: dateParam, time: timeParam, venue: venueParam, tier: tierParam },
+      ticketPayload,
       error: errorDetail
     }),
     now
@@ -319,44 +241,39 @@ export async function sendWhatsAppTextMessage({
   toPhone: string;
   messageText: string;
 }) {
-  const isEnabled = process.env.WHATSAPP_ENABLED === 'true';
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN || '';
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+  const recipientPhone = normalizePhoneForService(toPhone);
 
-  let recipientPhone = toPhone.replace(/[^0-9]/g, '');
-  if (recipientPhone.length === 10) recipientPhone = `91${recipientPhone}`;
-
-  if (!isEnabled || !accessToken || !phoneNumberId) {
-    console.log(`[WhatsApp Simulated Text to ${recipientPhone}]:\n${messageText}`);
-    return { success: true, simulated: true };
-  }
+  const apiUrl = `${process.env.WHATSAPP_SERVICE_BASE_URL || 'http://localhost:8000'}/api/send-message`;
 
   try {
-    const payload = {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: recipientPhone,
-      type: 'text',
-      text: {
-        preview_url: false,
-        body: messageText
-      }
-    };
-
-    const res = await fetch(`https://graph.facebook.com/v22.0/${phoneNumberId}/messages`, {
+    console.log(`[WhatsApp Service] Sending message to ${recipientPhone} via ${apiUrl}...`);
+    const res = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        'accept': '*/*',
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        phone: recipientPhone,
+        message: messageText
+      })
     });
 
-    const json = await res.json();
-    console.log('[WhatsApp Text API response]:', JSON.stringify(json));
-    return { success: res.ok, data: json };
+    const json = await res.json().catch(() => null);
+    console.log(`[WhatsApp Service Response ${res.status}]:`, json);
+
+    if (!res.ok) {
+      console.warn(`[WhatsApp Service Warning]: HTTP ${res.status}`, json);
+      return { 
+        success: false, 
+        status: res.status, 
+        detail: json?.detail || json?.message || 'Failed to send WhatsApp message' 
+      };
+    }
+
+    return { success: true, data: json };
   } catch (err: any) {
-    console.error('[WhatsApp Text Error]:', err);
+    console.error('[WhatsApp Service Exception]:', err);
     return { success: false, error: err.message };
   }
 }
@@ -382,14 +299,14 @@ export async function sendWhatsAppOrderProcessedMessage({
   const amountLine = amount ? `\n• *Amount:* ₹${amount}` : '';
 
   const messageText = 
-`🎟️ *Ticket Request Received!*
+`🎟️ *Transaction In Process!*
 
-Hi ${name}, your booking request for *${event}* has been processed!
+Hi ${name}, we are processing your transaction for *${event}*!
 
 • *Booking ID:* ${orderId}${amountLine}${utrLine}
-• *Status:* ⏳ Pending Organizer Verification
+• *Status:* ⏳ Verification In Progress
 
-Our team is verifying your payment with the bank. Once confirmed, your official entry pass with digital QR code will be dispatched here directly on WhatsApp.
+Our team is verifying your payment with the bank. Once confirmed, your ticket pass with digital QR code will be dispatched here directly on WhatsApp.
 
 Thank you!`;
 
@@ -419,7 +336,7 @@ Hi ${name}, we could not verify the payment for your booking request:
 • *Event:* ${event}
 • *Status:* Declined
 
-If you have already paid or believe this is an error, please reach out to event support with your payment receipt and UTR reference number.`;
+If you have already paid or believe this is an error, please reach out to event support with your payment receipt and reference number.`;
 
   return sendWhatsAppTextMessage({ toPhone, messageText });
 }
