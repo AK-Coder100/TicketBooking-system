@@ -117,9 +117,6 @@ export async function POST(
         ticketId,
         orderId,
         eventId: targetTier.event_id,
-        attendeeName,
-        tierId: targetTier.id,
-        issuedAt: now
       });
 
       await insertTicket.run(

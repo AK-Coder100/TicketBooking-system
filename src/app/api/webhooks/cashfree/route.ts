@@ -57,9 +57,6 @@ export async function POST(request: NextRequest) {
             ticketId,
             orderId,
             eventId: primaryTier.event_id,
-            attendeeName: order.customer_name,
-            tierId: primaryTier.id,
-            issuedAt: now
           });
 
           await db.prepare(`

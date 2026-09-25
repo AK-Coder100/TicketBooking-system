@@ -117,15 +117,14 @@ function OrganizerDashboardInner() {
       if (tabParam === 'events' || tabParam === 'teams' || tabParam === 'profile' || tabParam === 'dashboard' || tabParam === 'requests') {
         setActiveTab(tabParam as any);
       } else if (tabParam === 'scanner') {
-        setActiveTab('dashboard');
-        setScannerModalOpen(true);
+        router.push('/organizer/scanner');
       }
       const tenantParam = params.get('tenantId');
       if (tenantParam) {
         setSelectedTenantId(tenantParam);
       }
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     loadUserProfile();
@@ -134,12 +133,7 @@ function OrganizerDashboardInner() {
   // ── Tab Switcher with URL persistence ──
   const switchTab = (tab: 'dashboard' | 'requests' | 'events' | 'scanner' | 'teams' | 'profile') => {
     if (tab === 'scanner') {
-      setScannerModalOpen(true);
-      if (typeof window !== 'undefined') {
-        const url = new URL(window.location.href);
-        url.searchParams.set('tab', 'scanner');
-        window.history.replaceState(null, '', url.toString());
-      }
+      router.push('/organizer/scanner');
       return;
     }
     setActiveTab(tab);
@@ -2139,207 +2133,7 @@ function OrganizerDashboardInner() {
       {/* ════════════════════════════════════════════════════════════════════
           MODAL: GATE QR SCANNER TERMINAL (Mobile Fluid & No Overflow)
          ════════════════════════════════════════════════════════════════════ */}
-      {scannerModalOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(3, 7, 18, 0.88)',
-          backdropFilter: 'blur(12px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 110,
-          padding: '12px',
-          boxSizing: 'border-box'
-        }}>
-          <div style={{
-            background: '#0d1322',
-            border: '1px solid #1e293b',
-            borderRadius: 20,
-            width: '100%',
-            maxWidth: '780px',
-            maxHeight: '92vh',
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            padding: '20px 16px',
-            boxSizing: 'border-box',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 10 }}>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: '#ffffff', wordBreak: 'break-word' }}>Gate Verification Terminal</h3>
-                <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '4px 0 0' }}>Real-time gate clearance with tamper verification.</p>
-              </div>
-              <button
-                type="button"
-                onClick={closeScannerModal}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: 'none',
-                  color: '#ffffff',
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  cursor: 'pointer',
-                  fontSize: '1rem',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}
-              >
-                ✕
-              </button>
-            </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-              <span style={{ fontSize: '0.82rem', color: '#94a3b8', flexShrink: 0 }}>Event:</span>
-              <select
-                className="form-control"
-                style={{
-                  width: '100%',
-                  flex: 1,
-                  minWidth: 0,
-                  background: '#1e293b',
-                  padding: '7px 10px',
-                  fontSize: '0.82rem',
-                  borderRadius: 8,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}
-                value={selectedEventId}
-                onChange={e => {
-                  setSelectedEventId(e.target.value);
-                  setSelectedSessionId('ALL');
-                }}
-              >
-                {events.map(e => <option key={e.id} value={e.id}>{e.title}</option>)}
-              </select>
-            </div>
-
-            {/* Active Gate Session Selector */}
-            {activeEvent?.sessions && activeEvent.sessions.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-                <span style={{ fontSize: '0.82rem', color: '#38bdf8', fontWeight: 700, flexShrink: 0 }}>Active Session:</span>
-                <select
-                  className="form-control"
-                  style={{
-                    width: '100%',
-                    flex: 1,
-                    minWidth: 0,
-                    background: '#1e293b',
-                    border: '1px solid #38bdf8',
-                    color: '#34d399',
-                    fontWeight: 700,
-                    padding: '7px 10px',
-                    fontSize: '0.82rem',
-                    borderRadius: 8,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}
-                  value={selectedSessionId}
-                  onChange={e => setSelectedSessionId(e.target.value)}
-                >
-                  <option value="ALL">🌐 All Event Sessions</option>
-                  {activeEvent.sessions.map((s: any) => (
-                    <option key={s.id} value={s.id}>🎭 {s.name} ({s.session_date})</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 16, width: '100%', boxSizing: 'border-box' }}>
-              {/* Camera & Input Panel */}
-              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #1e293b', borderRadius: 14, padding: '16px 14px', width: '100%', boxSizing: 'border-box', minWidth: 0 }}>
-                <div style={{ width: '100%', height: 200, background: '#020617', borderRadius: 12, overflow: 'hidden', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <video ref={videoRef} playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: cameraActive ? 'block' : 'none' }} />
-                  {!cameraActive && (
-                    <div style={{ textAlign: 'center', padding: 16 }}>
-                      <div style={{ fontSize: '2rem', marginBottom: 4 }}>📷</div>
-                      <div style={{ fontWeight: 'bold', fontSize: '0.85rem', color: '#e2e8f0' }}>Camera Inactive</div>
-                      <button className="btn btn-primary btn-sm" style={{ marginTop: 8, padding: '6px 14px', fontSize: '0.8rem' }} onClick={toggleCamera}>Start Camera</button>
-                    </div>
-                  )}
-                  {cameraActive && (
-                    <button className="btn btn-danger btn-sm" style={{ position: 'absolute', bottom: 8, right: 8 }} onClick={toggleCamera}>Stop Camera</button>
-                  )}
-                </div>
-
-                <div style={{ marginTop: 14 }}>
-                  <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Manual Token / QR Code Entry</label>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Paste signed QR token..."
-                      value={manualToken}
-                      onChange={e => setManualToken(e.target.value)}
-                      style={{ fontSize: '0.82rem', padding: '8px 10px', minWidth: 0, flex: 1 }}
-                    />
-                    <button className="btn btn-primary btn-sm" style={{ padding: '8px 14px', fontSize: '0.82rem', flexShrink: 0 }} onClick={() => executeScan(manualToken)}>Verify</button>
-                  </div>
-                </div>
-
-                <div style={{ marginTop: 14, padding: 10, background: 'rgba(255,255,255,0.03)', borderRadius: 10, boxSizing: 'border-box', width: '100%' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#a5b4fc', fontWeight: 800, marginBottom: 6 }}>SIMULATE INSTANT SCAN:</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5, width: '100%', boxSizing: 'border-box' }}>
-                    <button className="btn btn-success btn-sm" style={{ fontSize: '0.75rem', padding: '6px 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} onClick={() => { const first = attendees[0]?.qr_secret_token; if (first) executeScan(first); else alert('No tickets booked yet!'); }}>🟢 Valid</button>
-                    <button className="btn btn-warning btn-sm" style={{ fontSize: '0.75rem', padding: '6px 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} onClick={() => { const first = attendees[0]?.qr_secret_token; if (first) executeScan(first); else alert('No tickets booked yet!'); }}>🟡 Scanned</button>
-                    <button className="btn btn-danger btn-sm" style={{ fontSize: '0.75rem', padding: '6px 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} onClick={() => executeScan('invalid_token.tampered')}>🔴 Invalid</button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Output Panel */}
-              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #1e293b', borderRadius: 14, padding: '16px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', width: '100%', boxSizing: 'border-box', minWidth: 0 }}>
-                {!scanResult && (
-                  <div style={{ textAlign: 'center', color: '#64748b', padding: 24 }}>
-                    <div style={{ fontSize: '2.2rem', marginBottom: 8 }}>⏳</div>
-                    <div style={{ fontWeight: 700, fontSize: '0.98rem', color: '#e2e8f0' }}>Scanner Ready</div>
-                    <p style={{ fontSize: '0.8rem', marginTop: 4 }}>Scan an attendee QR code or test using the simulation buttons.</p>
-                  </div>
-                )}
-
-                {scanResult && (scanResult.status === 'VALID' || scanResult.status === 'RE_ENTRY_ALLOWED') && (
-                  <div style={{ background: 'rgba(16,185,129,0.12)', border: '2px solid #10b981', borderRadius: 14, padding: 16 }}>
-                    <div style={{ color: '#10b981', fontWeight: 800, fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: 6 }}><span>✓</span><span>ACCESS GRANTED</span></div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 800, marginTop: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{scanResult.ticket?.attendeeName || 'Attendee'}</div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                      <span className="badge badge-purple">{scanResult.ticket?.tierName}</span>
-                      <span className="badge badge-green">VERIFIED PASS</span>
-                    </div>
-                    <div style={{ marginTop: 10, fontSize: '0.78rem', color: '#a7f3d0' }}>Time: {new Date().toLocaleTimeString('en-IN')}</div>
-                  </div>
-                )}
-
-                {scanResult && scanResult.status === 'ALREADY_SCANNED' && (
-                  <div style={{ background: 'rgba(245,158,11,0.12)', border: '2px solid #f59e0b', borderRadius: 14, padding: 16 }}>
-                    <div style={{ color: '#f59e0b', fontWeight: 800, fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: 6 }}><span>⚠️</span><span>ALREADY SCANNED!</span></div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, marginTop: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{scanResult.ticket?.attendeeName}</div>
-                    <p style={{ fontSize: '0.78rem', color: '#fef3c7', marginTop: 3 }}>
-                      First checked in at {new Date(scanResult.ticket?.firstCheckedInAt).toLocaleTimeString('en-IN')}.
-                    </p>
-                    <button className="btn btn-warning" style={{ width: '100%', marginTop: 12, fontSize: '0.82rem', padding: '8px 12px' }} onClick={() => handleOverride(scanResult.ticket?.id)}>🔓 Allow Re-entry (Override)</button>
-                  </div>
-                )}
-
-                {scanResult && (scanResult.status === 'INVALID' || scanResult.status === 'WRONG_EVENT') && (
-                  <div style={{ background: 'rgba(244,63,94,0.12)', border: '2px solid #f43f5e', borderRadius: 14, padding: 16 }}>
-                    <div style={{ color: '#f43f5e', fontWeight: 800, fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: 6 }}><span>✕</span><span>ACCESS DENIED</span></div>
-                    <div style={{ fontSize: '0.98rem', fontWeight: 700, marginTop: 6, wordBreak: 'break-word' }}>{scanResult.reason}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ════════════════════════════════════════════════════════════════════
           MODAL: ADD TEAM MEMBER

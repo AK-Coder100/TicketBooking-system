@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, use, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { getActiveSessionByTime } from '@/lib/session-utils';
 
 interface Participant {
   ticket_id: string;
@@ -128,16 +129,6 @@ function EventMembersContent({ eventId }: { eventId: string }) {
       setParticipants(data.participants || []);
       setAuditLogs(data.auditLogs || []);
       setStats(data.stats || {});
-
-      // Auto-set active gate session if not already selected
-      if (loadedSessions.length > 0) {
-        setActiveGateSessionId(prev => {
-          if (prev !== 'ALL' && loadedSessions.some(s => s.id === prev)) return prev;
-          const todayStr = new Date().toISOString().split('T')[0];
-          const todaySess = loadedSessions.find(s => s.session_date === todayStr);
-          return todaySess ? todaySess.id : loadedSessions[0].id;
-        });
-      }
     } catch (err: any) {
       setError(err.message || 'An error occurred');
     } finally {
@@ -149,15 +140,19 @@ function EventMembersContent({ eventId }: { eventId: string }) {
     loadData();
   }, [eventId, tenantIdQuery]);
 
+  // Automatic Real-Time Date & Time Session Calculation
+  const sessionStatus = useMemo(() => {
+    return getActiveSessionByTime(sessions, new Date());
+  }, [sessions]);
+
   // Handle participant status actions with Active Session enforcement
   const handleParticipantAction = async (ticketId: string, action: 'CHECKIN' | 'UNCHECK' | 'OVERRIDE', targetParticipant?: Participant) => {
-    // If admitting, check active session
-    if (action === 'CHECKIN' && targetParticipant && activeGateSessionId !== 'ALL') {
-      if (targetParticipant.session_id && targetParticipant.session_id !== activeGateSessionId) {
-        const activeSessObj = sessions.find(s => s.id === activeGateSessionId);
+    // If admitting, check automatic date and time session
+    if (action === 'CHECKIN' && targetParticipant && sessions.length > 1 && sessionStatus.activeSession) {
+      if (targetParticipant.session_id && targetParticipant.session_id !== sessionStatus.activeSession.id) {
         setActionFeedback({
           type: 'error',
-          message: `Cannot Admit: Pass is for "${targetParticipant.session_name || 'Another Show'}" (${targetParticipant.session_date || 'scheduled date'}), but active checkpoint session is "${activeSessObj?.name || 'Selected Show'}". Switch active session or use "+ Re-entry".`
+          message: `Inactive Show: Pass is valid for "${targetParticipant.session_name || 'Show'}" (${targetParticipant.session_date || ''} ${targetParticipant.start_time || ''}), but currently active show by date & time is "${sessionStatus.activeSession.name}" (${sessionStatus.activeSession.session_date} ${sessionStatus.activeSession.start_time || ''}). Use Supervisor Override to admit anyway.`
         });
         return;
       }
@@ -383,10 +378,10 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                 background: 'rgba(255, 255, 255, 0.08)',
                 border: '1px solid rgba(255, 255, 255, 0.12)',
                 color: '#f8fafc',
-                width: 36,
-                height: 36,
-                borderRadius: 10,
-                fontSize: '1rem',
+                width: 44,
+                height: 44,
+                borderRadius: 12,
+                fontSize: '1.15rem',
                 fontWeight: 700,
                 textDecoration: 'none',
                 flexShrink: 0
@@ -424,14 +419,16 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                 background: 'rgba(255, 255, 255, 0.06)',
                 border: '1px solid rgba(255, 255, 255, 0.15)',
                 color: '#cbd5e1',
-                padding: '6px 10px',
-                borderRadius: 8,
-                fontSize: '0.76rem',
+                padding: '8px 12px',
+                borderRadius: 10,
+                fontSize: '0.78rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 4
+                gap: 4,
+                minHeight: 44,
+                touchAction: 'manipulation'
               }}
               title="Toggle Cards or Table view"
             >
@@ -446,18 +443,41 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                 background: 'rgba(99, 102, 241, 0.18)',
                 border: '1px solid rgba(99, 102, 241, 0.35)',
                 color: '#a5b4fc',
-                padding: '6px 10px',
-                borderRadius: 8,
-                fontSize: '0.76rem',
+                padding: '8px 12px',
+                borderRadius: 10,
+                fontSize: '0.78rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 4
+                gap: 4,
+                minHeight: 44,
+                touchAction: 'manipulation'
               }}
             >
               📋 Logs ({auditLogs.length})
             </button>
+
+            {/* Direct Scanner Link */}
+            <Link
+              href={`/organizer/scanner?eventId=${eventId}`}
+              style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: '#ffffff',
+                textDecoration: 'none',
+                padding: '8px 14px',
+                borderRadius: 10,
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                minHeight: 44,
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.35)'
+              }}
+            >
+              ⚡ Scanner
+            </Link>
 
             {/* Refresh Button */}
             <button
@@ -468,14 +488,16 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                 background: 'linear-gradient(135deg, #38bdf8 0%, #6366f1 100%)',
                 border: 'none',
                 color: '#ffffff',
-                padding: '6px 12px',
-                borderRadius: 8,
+                padding: '8px 14px',
+                borderRadius: 10,
                 fontSize: '0.78rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 4,
+                minHeight: 44,
+                touchAction: 'manipulation',
                 boxShadow: '0 2px 8px rgba(56, 189, 248, 0.25)'
               }}
             >
@@ -553,55 +575,63 @@ function EventMembersContent({ eventId }: { eventId: string }) {
 
 
 
-        {/* ── Active Gate Session Selector Banner ──────────────────────────── */}
+        {/* ── Active Gate Session Banner (Automated by Real-time Date & Time) ─────── */}
         {sessions.length > 0 && (
           <div style={{
-            background: 'linear-gradient(135deg, rgba(30, 27, 75, 0.85) 0%, rgba(13, 19, 34, 0.98) 100%)',
-            border: '1px solid rgba(99, 102, 241, 0.4)',
+            background: 'linear-gradient(135deg, rgba(30, 27, 75, 0.9) 0%, rgba(13, 19, 34, 0.98) 100%)',
+            border: '1.5px solid rgba(99, 102, 241, 0.5)',
             borderRadius: 14,
-            padding: '12px 14px',
-            marginBottom: 12,
+            padding: '12px 16px',
+            marginBottom: 14,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             flexWrap: 'wrap',
-            gap: 10
+            gap: 12
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-              <span style={{ fontSize: '1.1rem' }}>🟢</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+              <span style={{ fontSize: '1.25rem' }}>{sessionStatus.status === 'LIVE_NOW' ? '🟢' : '⏳'}</span>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: '0.68rem', color: '#a5b4fc', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  ACTIVE GATE SESSION (ADMISSIONS ACTIVE)
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.68rem', color: '#a5b4fc', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    AUTOMATIC SESSION ENGINE (BY DATE & TIME):
+                  </span>
+                  <span style={{
+                    background: sessionStatus.status === 'LIVE_NOW' ? '#047857' : '#0369a1',
+                    color: '#ffffff',
+                    fontSize: '0.62rem',
+                    fontWeight: 800,
+                    padding: '1px 6px',
+                    borderRadius: 4
+                  }}>
+                    {sessionStatus.status}
+                  </span>
                 </div>
-                <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  Only tickets matching the active show can be admitted
+                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ffffff', marginTop: 2 }}>
+                  {sessionStatus.label} • <span style={{ color: '#cbd5e1', fontWeight: 500, fontSize: '0.8rem' }}>{sessionStatus.description}</span>
                 </div>
               </div>
             </div>
 
-            <select
-              value={activeGateSessionId}
-              onChange={e => setActiveGateSessionId(e.target.value)}
+            <Link
+              href={`/organizer/scanner?eventId=${eventId}`}
               style={{
-                background: '#1e293b',
-                border: '1.5px solid #38bdf8',
-                color: '#34d399',
-                borderRadius: 8,
-                padding: '7px 12px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: '#ffffff',
+                textDecoration: 'none',
+                padding: '8px 16px',
+                borderRadius: 10,
                 fontSize: '0.82rem',
-                fontWeight: 700,
-                outline: 'none',
-                cursor: 'pointer',
-                maxWidth: '260px'
+                fontWeight: 800,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
+                flexShrink: 0
               }}
             >
-              <option value="ALL">🌐 Allow All Sessions (No restriction)</option>
-              {sessions.map(s => (
-                <option key={s.id} value={s.id}>
-                  🎭 {s.name} ({s.session_date})
-                </option>
-              ))}
-            </select>
+              ⚡ Open Gate Scanner →
+            </Link>
           </div>
         )}
 
@@ -913,11 +943,13 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                     width: '100%',
                     background: '#131b2e',
                     border: '1px solid #334155',
-                    borderRadius: 8,
-                    padding: '8px 10px',
+                    borderRadius: 10,
+                    padding: '10px 12px',
                     color: '#f8fafc',
-                    fontSize: '0.8rem',
-                    outline: 'none'
+                    fontSize: '16px',
+                    outline: 'none',
+                    minHeight: 44,
+                    boxSizing: 'border-box' as const
                   }}
                 >
                   <option value="ALL">All Sessions ({sessions.length})</option>
@@ -941,11 +973,13 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                     width: '100%',
                     background: '#131b2e',
                     border: '1px solid #334155',
-                    borderRadius: 8,
-                    padding: '8px 10px',
+                    borderRadius: 10,
+                    padding: '10px 12px',
                     color: '#f8fafc',
-                    fontSize: '0.8rem',
-                    outline: 'none'
+                    fontSize: '16px',
+                    outline: 'none',
+                    minHeight: 44,
+                    boxSizing: 'border-box' as const
                   }}
                 >
                   <option value="ALL">All Tiers ({tiers.length})</option>
@@ -969,11 +1003,13 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                     width: '100%',
                     background: '#131b2e',
                     border: '1px solid #334155',
-                    borderRadius: 8,
-                    padding: '8px 10px',
+                    borderRadius: 10,
+                    padding: '10px 12px',
                     color: '#f8fafc',
-                    fontSize: '0.8rem',
-                    outline: 'none'
+                    fontSize: '16px',
+                    outline: 'none',
+                    minHeight: 44,
+                    boxSizing: 'border-box' as const
                   }}
                 >
                   <option value="NEWEST">Newest Booking</option>
@@ -1203,16 +1239,17 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                                 background: 'rgba(16, 185, 129, 0.15)',
                                 color: '#34d399',
                                 border: '1px solid rgba(16, 185, 129, 0.3)',
-                                borderRadius: 8,
-                                padding: '6px 10px',
-                                fontSize: '0.74rem',
+                                borderRadius: 10,
+                                padding: '8px 12px',
+                                fontSize: '0.8rem',
                                 fontWeight: 700,
                                 textDecoration: 'none',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: 4,
-                                minHeight: 34,
-                                boxSizing: 'border-box'
+                                minHeight: 44,
+                                boxSizing: 'border-box',
+                                touchAction: 'manipulation'
                               }}
                             >
                               💬 WA
@@ -1223,16 +1260,17 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                                 background: 'rgba(255, 255, 255, 0.06)',
                                 color: '#cbd5e1',
                                 border: '1px solid rgba(255, 255, 255, 0.12)',
-                                borderRadius: 8,
-                                padding: '6px 10px',
-                                fontSize: '0.74rem',
+                                borderRadius: 10,
+                                padding: '8px 12px',
+                                fontSize: '0.8rem',
                                 fontWeight: 600,
                                 textDecoration: 'none',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: 4,
-                                minHeight: 34,
-                                boxSizing: 'border-box'
+                                minHeight: 44,
+                                boxSizing: 'border-box',
+                                touchAction: 'manipulation'
                               }}
                             >
                               📞 Call
@@ -1255,12 +1293,12 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                                 background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
                                 color: '#ffffff',
                                 border: 'none',
-                                borderRadius: 8,
-                                padding: '6px 10px',
-                                fontSize: '0.74rem',
+                                borderRadius: 10,
+                                padding: '8px 12px',
+                                fontSize: '0.8rem',
                                 fontWeight: 700,
                                 cursor: 'pointer',
-                                minHeight: 34,
+                                minHeight: 44,
                                 touchAction: 'manipulation'
                               }}
                             >
@@ -1274,12 +1312,12 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                                 background: 'rgba(239, 68, 68, 0.12)',
                                 color: '#f87171',
                                 border: '1px solid rgba(239, 68, 68, 0.25)',
-                                borderRadius: 8,
-                                padding: '6px 8px',
-                                fontSize: '0.74rem',
+                                borderRadius: 10,
+                                padding: '8px 10px',
+                                fontSize: '0.8rem',
                                 fontWeight: 600,
                                 cursor: 'pointer',
-                                minHeight: 34,
+                                minHeight: 44,
                                 touchAction: 'manipulation'
                               }}
                             >
@@ -1297,15 +1335,15 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                                 : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                               color: '#ffffff',
                               border: 'none',
-                              borderRadius: 8,
-                              padding: '6px 14px',
-                              fontSize: '0.78rem',
+                              borderRadius: 10,
+                              padding: '8px 14px',
+                              fontSize: '0.85rem',
                               fontWeight: 800,
                               cursor: 'pointer',
                               boxShadow: '0 2px 10px rgba(16, 185, 129, 0.3)',
-                              minHeight: 34,
+                              minHeight: 44,
                               flex: '1 1 auto',
-                              maxWidth: '120px',
+                              maxWidth: '140px',
                               touchAction: 'manipulation'
                             }}
                             title={activeGateSessionId !== 'ALL' && p.session_id && p.session_id !== activeGateSessionId ? 'Ticket belongs to inactive session show' : 'Admit participant'}
@@ -1325,12 +1363,12 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                             background: 'rgba(255, 255, 255, 0.08)',
                             color: '#e2e8f0',
                             border: '1px solid rgba(255, 255, 255, 0.15)',
-                            borderRadius: 8,
-                            padding: '6px 10px',
-                            fontSize: '0.74rem',
+                            borderRadius: 10,
+                            padding: '8px 12px',
+                            fontSize: '0.8rem',
                             fontWeight: 600,
                             cursor: 'pointer',
-                            minHeight: 34,
+                            minHeight: 44,
                             touchAction: 'manipulation'
                           }}
                         >
@@ -1621,23 +1659,23 @@ function EventMembersContent({ eventId }: { eventId: string }) {
 
         {/* Dock 3: QR Scanner */}
         <Link
-          href={`/organizer?tab=scanner${tenantIdQuery ? `&tenantId=${tenantIdQuery}` : ''}`}
+          href={`/organizer/scanner?eventId=${eventId}${tenantIdQuery ? `&tenantId=${tenantIdQuery}` : ''}`}
           style={{
-            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
             color: '#ffffff',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
             textDecoration: 'none',
-            width: 48,
-            height: 48,
+            width: 52,
+            height: 52,
             borderRadius: '50%',
-            boxShadow: '0 4px 16px rgba(99, 102, 241, 0.5)',
+            boxShadow: '0 4px 16px rgba(16, 185, 129, 0.5)',
             marginBottom: 10,
-            fontSize: '1.3rem'
+            fontSize: '1.4rem'
           }}
-          title="Launch Camera Scanner"
+          title="Launch Gate Scanner"
         >
           ⚡
         </Link>
@@ -1736,13 +1774,14 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                   border: 'none',
                   color: '#94a3b8',
                   borderRadius: '50%',
-                  width: 32,
-                  height: 32,
-                  fontSize: '1.2rem',
+                  width: 44,
+                  height: 44,
+                  fontSize: '1.3rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  touchAction: 'manipulation'
                 }}
               >
                 &times;
@@ -1968,13 +2007,14 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                   border: 'none',
                   color: '#94a3b8',
                   borderRadius: '50%',
-                  width: 32,
-                  height: 32,
-                  fontSize: '1.2rem',
+                  width: 44,
+                  height: 44,
+                  fontSize: '1.3rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  touchAction: 'manipulation'
                 }}
               >
                 &times;
