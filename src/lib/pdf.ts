@@ -87,10 +87,10 @@ export async function generateTicketPdf({ ticket, order, event, tier, tenant }: 
       doc.fillColor(darkColor).fontSize(12).font('Helvetica').text(`${ticket.attendee_age} years`, cardX + 24, infoY + 107);
 
       doc.fillColor(textMuted).fontSize(9).font('Helvetica-Bold').text('TICKET ID', cardX + 130, infoY + 95);
-      doc.fillColor(darkColor).fontSize(11).font('Helvetica-Bold').text(ticket.id, cardX + 130, infoY + 107);
+      doc.fillColor(darkColor).fontSize(11).font('Helvetica-Bold').text(ticket.id, cardX + 130, infoY + 107, { width: 135, lineBreak: false });
 
       doc.fillColor(textMuted).fontSize(9).font('Helvetica-Bold').text('BOOKING ORDER', cardX + 24, infoY + 135);
-      doc.fillColor(darkColor).fontSize(10).font('Helvetica').text(order.id, cardX + 24, infoY + 147);
+      doc.fillColor(darkColor).fontSize(11).font('Helvetica-Bold').text(order.id, cardX + 24, infoY + 147, { width: 100, lineBreak: false });
 
       doc.fillColor(textMuted).fontSize(9).font('Helvetica-Bold').text('PHONE (GUEST AUTH)', cardX + 130, infoY + 135);
       doc.fillColor(darkColor).fontSize(10).font('Helvetica').text(order.customer_phone, cardX + 130, infoY + 147);

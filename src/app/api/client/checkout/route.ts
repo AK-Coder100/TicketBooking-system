@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getActiveReservation } from '@/lib/reservation';
 import { computeSplitRules, PaymentService } from '@/lib/payment';
+import { generateOrderId } from '@/lib/id';
 import crypto from 'node:crypto';
 
 export async function POST(request: NextRequest) {
@@ -98,8 +99,8 @@ export async function POST(request: NextRequest) {
       platformSettings
     });
 
-    // Generate clean readable Booking ID (e.g. BK-849201-145)
-    const orderId = `BK-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+    // Generate clean readable Booking ID (e.g. BK-7M4P9X, 9 characters)
+    const orderId = generateOrderId('BK');
     const now = new Date().toISOString();
 
     // Check or create customer

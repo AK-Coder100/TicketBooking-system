@@ -22,50 +22,7 @@ export default function HomePage() {
 
   return (
     <div style={{ maxWidth: 1120, margin: '0 auto', padding: '24px 20px' }}>
-      
-      {/* Top Merchant Identity & Compliance Strip */}
-      <div style={{
-        background: 'rgba(99, 102, 241, 0.1)',
-        border: '1px solid rgba(99, 102, 241, 0.25)',
-        borderRadius: 12,
-        padding: '12px 18px',
-        marginBottom: 28,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: 12,
-        fontSize: '0.85rem'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span style={{ background: '#4f46e5', color: '#ffffff', padding: '2px 8px', borderRadius: 6, fontSize: '0.72rem', fontWeight: 800 }}>
-            OFFICIAL MERCHANT
-          </span>
-          <span style={{ color: '#ffffff', fontWeight: 700 }}>
-            {MERCHANT_CONFIG.legalName}
-          </span>
-          <span style={{ color: 'var(--text-dim)' }}>•</span>
-          <span style={{ color: 'var(--text-muted)' }}>
-            📍 {MERCHANT_CONFIG.operatingVenue}
-          </span>
-          <span style={{ color: 'var(--text-dim)' }}>•</span>
-          <span style={{ color: '#34d399', fontWeight: 600 }}>
-            📞 {MERCHANT_CONFIG.phoneDisplay}
-          </span>
-        </div>
 
-        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-          <Link href={NAV_LINKS.about} style={{ color: '#818cf8', textDecoration: 'none', fontWeight: 600, fontSize: '0.82rem' }}>
-            About Us
-          </Link>
-          <Link href={NAV_LINKS.contact} style={{ color: '#818cf8', textDecoration: 'none', fontWeight: 600, fontSize: '0.82rem' }}>
-            Contact
-          </Link>
-          <Link href={NAV_LINKS.wallet} style={{ color: '#ffffff', textDecoration: 'none', fontWeight: 700, fontSize: '0.82rem', background: 'rgba(255,255,255,0.08)', padding: '4px 10px', borderRadius: 6 }}>
-            📱 My Tickets
-          </Link>
-        </div>
-      </div>
 
       {/* Hero Header */}
       <div style={{ marginBottom: 36 }}>

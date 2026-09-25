@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { generateTicketToken } from '@/lib/crypto';
 import { sendWhatsAppTicketMessage } from '@/lib/whatsapp';
+import { generateTicketId } from '@/lib/id';
 import crypto from 'node:crypto';
 
 export async function POST(request: NextRequest) {
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
         if (!existingTickets || parseInt(existingTickets.count || '0', 10) === 0) {
           const tenantTiers: any[] = await db.prepare('SELECT tt.*, e.id as event_id FROM ticket_tiers tt JOIN events e ON tt.event_id = e.id WHERE e.tenant_id = ?').all(order.tenant_id);
           const primaryTier = tenantTiers[0] || { id: 'tier_default', event_id: 'evt_default' };
-          const ticketId = `tkt_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+          const ticketId = generateTicketId(orderId, 0);
           const token = generateTicketToken({
             ticketId,
             orderId,

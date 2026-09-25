@@ -185,14 +185,14 @@ export async function GET(
                 {/* Age & Ticket ID */}
                 <div style={{ display: 'flex', marginTop: '16px', gap: '20px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', width: '70px' }}>
-                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 800 }}>AGE</span>
+                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 800, letterSpacing: '0.5px' }}>AGE</span>
                     <span style={{ fontSize: '13px', color: '#0f172a', fontWeight: 700, marginTop: '2px' }}>
                       {ticket.attendee_age} years
                     </span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 800 }}>TICKET ID</span>
-                    <span style={{ fontSize: '11px', color: '#0f172a', fontWeight: 800, marginTop: '2px', wordBreak: 'break-all' }}>
+                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 800, letterSpacing: '0.5px' }}>TICKET ID</span>
+                    <span style={{ fontSize: '12px', color: '#0f172a', fontWeight: 800, marginTop: '2px', fontFamily: 'monospace', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
                       {ticket.id}
                     </span>
                   </div>
@@ -200,15 +200,15 @@ export async function GET(
 
                 {/* Booking Order & Phone */}
                 <div style={{ display: 'flex', marginTop: '14px', gap: '20px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', width: '130px' }}>
-                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 800 }}>BOOKING ORDER</span>
-                    <span style={{ fontSize: '10px', color: '#0f172a', fontWeight: 700, marginTop: '2px', wordBreak: 'break-all' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', width: '110px' }}>
+                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 800, letterSpacing: '0.5px' }}>BOOKING ORDER</span>
+                    <span style={{ fontSize: '12px', color: '#0f172a', fontWeight: 800, marginTop: '2px', fontFamily: 'monospace', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
                       {ticket.order_id}
                     </span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 800 }}>PHONE (GUEST AUTH)</span>
-                    <span style={{ fontSize: '11px', color: '#0f172a', fontWeight: 700, marginTop: '2px' }}>
+                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 800, letterSpacing: '0.5px' }}>PHONE (GUEST AUTH)</span>
+                    <span style={{ fontSize: '11px', color: '#0f172a', fontWeight: 700, marginTop: '2px', whiteSpace: 'nowrap' }}>
                       {ticket.customer_phone || 'N/A'}
                     </span>
                   </div>

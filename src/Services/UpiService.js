@@ -50,12 +50,20 @@ export function validateVpa(vpa) {
 // IDENTIFIER GENERATION
 // ──────────────────────────────────────────────────────────────────────────
 
-export function generateOrderId(prefix = 'ord') {
-  return `${prefix}_${crypto.randomBytes(8).toString('hex')}`;
+export function generateOrderId(prefix = 'BK') {
+  const epochSec = Math.floor(Date.now() / 1000);
+  const timePart = epochSec.toString(36).toUpperCase().slice(-3);
+  const CHARSET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const bytes = crypto.randomBytes(4);
+  let randPart = '';
+  for (let i = 0; i < 4; i++) {
+    randPart += CHARSET[bytes[i] % CHARSET.length];
+  }
+  return `${prefix}-${timePart}${randPart}`;
 }
 
 export function generatePaymentId(prefix = 'pay') {
-  return `${prefix}_${crypto.randomBytes(12).toString('hex')}`;
+  return `${prefix}_${crypto.randomBytes(6).toString('hex')}`;
 }
 
 // ──────────────────────────────────────────────────────────────────────────

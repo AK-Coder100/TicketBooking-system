@@ -510,11 +510,11 @@ export default function SuperAdminDashboard() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                               <div style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <span style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '1px 5px', borderRadius: 4, fontFamily: 'monospace', fontWeight: 800, fontSize: '0.68rem' }}>tr</span>
-                                <code style={{ color: '#38bdf8', fontWeight: 700 }}>{order.id}</code>
+                                <code style={{ color: '#38bdf8', fontWeight: 700, fontFamily: 'monospace' }}>{order.id}</code>
                               </div>
                               <div style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <span style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', padding: '1px 5px', borderRadius: 4, fontFamily: 'monospace', fontWeight: 800, fontSize: '0.68rem' }}>tn</span>
-                                <code style={{ color: '#fbbf24', fontWeight: 700, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`Booking ${order.id}${order.event_title ? ` - ${order.event_title}` : ''}`}>
+                                <code style={{ color: '#fbbf24', fontWeight: 700, fontFamily: 'monospace', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`Booking ${order.id}${order.event_title ? ` - ${order.event_title}` : ''}`}>
                                   Booking {order.id}{order.event_title ? ` - ${order.event_title}` : ''}
                                 </code>
                               </div>

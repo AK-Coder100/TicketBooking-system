@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { generateTicketToken } from '@/lib/crypto';
 import { sendWhatsAppTicketMessage } from '@/lib/whatsapp';
+import { generateTicketId } from '@/lib/id';
 import crypto from 'node:crypto';
 
 export async function POST(
@@ -89,7 +90,7 @@ export async function POST(
           `).get(targetTierId)) || bookedTier
         : bookedTier;
 
-      const ticketId = `tkt_${Date.now()}_${i}_${crypto.randomBytes(3).toString('hex')}`;
+      const ticketId = generateTicketId(orderId, i);
       const attendeeName = att.name?.trim() || `${order.customer_name} (Guest ${i + 1})`;
       const attendeeAge = parseInt(String(att.age), 10) || 25;
 
