@@ -122,7 +122,7 @@ export function getActiveSessionByTime(
     return {
       activeSession: liveSession,
       status: 'LIVE_NOW',
-      label: `Live: ${liveSession.name}`,
+      label: liveSession.name,
       description: `Active Gate Window (${liveSession.formattedWindow})`,
       allSessionsWithStatus: evaluated
     };
@@ -135,7 +135,7 @@ export function getActiveSessionByTime(
     return {
       activeSession: next, // Next active show
       status: 'UPCOMING',
-      label: `Next Show: ${next.name}`,
+      label: next.name,
       description: `Gate opens at ${new Date(next.gateOpenMs).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} (${next.formattedWindow})`,
       nextSession: next,
       allSessionsWithStatus: evaluated
@@ -147,7 +147,7 @@ export function getActiveSessionByTime(
   return {
     activeSession: lastSession,
     status: 'CONCLUDED',
-    label: `Concluded: ${lastSession.name}`,
+    label: lastSession.name,
     description: `All shows have ended. Last show was ${lastSession.formattedWindow}`,
     allSessionsWithStatus: evaluated
   };

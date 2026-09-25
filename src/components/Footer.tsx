@@ -1,7 +1,15 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { MERCHANT_CONFIG, SITE_CONFIG, NAV_LINKS } from '@/lib/constants';
 
 export default function Footer() {
+  const pathname = usePathname();
+  if (pathname?.includes('/scanner')) {
+    return null;
+  }
+
   return (
     <footer style={{
       borderTop: '1px solid var(--border-glass)',

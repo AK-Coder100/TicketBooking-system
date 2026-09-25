@@ -580,7 +580,6 @@ function OrganizerDashboardInner() {
   // ── Metrics Calculations ──────────────────────────────────────────────────
   const activeEvent = events.find(e => e.id === selectedEventId) || events[0] || null;
   const totalSessionsCount = events.reduce((acc, ev) => acc + (ev.sessions?.length || ev.session_count || 1), 0);
-  const activeSessionName = activeEvent?.sessions?.[0]?.name || 'Day 1 Grand Opening';
 
   const totalConfirmedTickets = stats.totalTickets ?? (attendees.length > 0 ? attendees.length : 248);
   const totalCheckedIn = stats.checkedInCount ?? attendees.filter(a => parseInt(a.checkin_count || '0', 10) > 0).length;
@@ -2262,7 +2261,7 @@ function OrganizerDashboardInner() {
                         {newEvent.sessions.length > 1 && <button type="button" onClick={() => removeSession(s.id)} style={{ color: '#fb7185', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>Remove</button>}
                       </div>
                       <div className="form-group">
-                        <input type="text" className="form-control" placeholder="Session Name (e.g. Day 1 Grand Opening)" value={s.name} onChange={e => updateSession(s.id, 'name', e.target.value)} required />
+                        <input type="text" className="form-control" placeholder="Day 1" value={s.name} onChange={e => updateSession(s.id, 'name', e.target.value)} required />
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 6 }}>
                         <input type="date" className="form-control" value={s.session_date} onChange={e => updateSession(s.id, 'session_date', e.target.value)} required />
