@@ -47,6 +47,7 @@ export default function TenantCheckoutPage() {
   const [breakdown, setBreakdown] = useState<any>(null);
   const [pendingOrder, setPendingOrder] = useState<any>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [upiPaymentTab, setUpiPaymentTab] = useState<'upi' | 'qr'>('upi');
   const [confirmedOrder, setConfirmedOrder] = useState<any>(null);
   const [confirmedTickets, setConfirmedTickets] = useState<any[]>([]);
   const [qrCodeMap, setQrCodeMap] = useState<Record<string, string>>({});
@@ -302,6 +303,7 @@ export default function TenantCheckoutPage() {
       if (!res.ok || !data.success) throw new Error(data.error || 'Checkout failed');
 
       setPendingOrder(data);
+      setUpiPaymentTab('upi');
       setShowPaymentModal(true);
     } catch (err: any) {
       setErrorMsg(err.message || 'Payment initiation error');
@@ -769,117 +771,213 @@ export default function TenantCheckoutPage() {
                   </div>
                 </div>
 
-                {/* QR Code Section */}
-                {upiData.qrCode && (
-                  <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                    <div style={{
-                      display: 'inline-block',
-                      padding: 10,
-                      background: '#ffffff',
-                      borderRadius: 14,
-                      boxShadow: '0 8px 30px rgba(0, 0, 0, 0.35)'
-                    }}>
-                      <img
-                        src={upiData.qrCode}
-                        alt="UPI Payment QR Code"
-                        style={{ width: 190, height: 190, display: 'block', borderRadius: 8 }}
-                      />
-                    </div>
-                    <div style={{ fontSize: '0.74rem', color: '#cbd5e1', fontWeight: 600, marginTop: 8 }}>
-                      Scan with any UPI App to Pay
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 6, marginTop: 6, fontSize: '0.7rem', color: '#94a3b8' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)' }}>Google Pay</span>
-                      <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)' }}>PhonePe</span>
-                      <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)' }}>Paytm</span>
-                      <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)' }}>BHIM</span>
-                      <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)' }}>Cred</span>
-                    </div>
-                  </div>
-                )}
+                {/* Segmented Payment Tabs: UPI vs QR Code */}
+                <div style={{
+                  display: 'flex',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  padding: 4,
+                  borderRadius: 12,
+                  marginBottom: 16,
+                  border: '1px solid rgba(255, 255, 255, 0.08)'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => setUpiPaymentTab('upi')}
+                    style={{
+                      flex: 1,
+                      padding: '9px 12px',
+                      borderRadius: 8,
+                      border: 'none',
+                      background: upiPaymentTab === 'upi' ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : 'transparent',
+                      color: upiPaymentTab === 'upi' ? '#ffffff' : '#94a3b8',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      transition: 'all 0.15s ease',
+                      boxShadow: upiPaymentTab === 'upi' ? '0 4px 14px rgba(99, 102, 241, 0.4)' : 'none'
+                    }}
+                  >
+                    <span>⚡</span> UPI
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUpiPaymentTab('qr')}
+                    style={{
+                      flex: 1,
+                      padding: '9px 12px',
+                      borderRadius: 8,
+                      border: 'none',
+                      background: upiPaymentTab === 'qr' ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : 'transparent',
+                      color: upiPaymentTab === 'qr' ? '#ffffff' : '#94a3b8',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      transition: 'all 0.15s ease',
+                      boxShadow: upiPaymentTab === 'qr' ? '0 4px 14px rgba(99, 102, 241, 0.4)' : 'none'
+                    }}
+                  >
+                    <span>📷</span> QR Code
+                  </button>
+                </div>
 
-                {/* Mobile Intent Buttons */}
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: '0.73rem', color: '#94a3b8', marginBottom: 6, fontWeight: 600 }}>Pay Directly on Mobile:</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-                    <a
-                      href={appLinks.gpay || upiLink}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 6,
-                        padding: '8px 10px',
-                        borderRadius: 8,
-                        background: 'rgba(66, 133, 244, 0.15)',
-                        border: '1px solid rgba(66, 133, 244, 0.35)',
-                        color: '#60a5fa',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        textDecoration: 'none'
-                      }}
-                    >
-                      <span>⚡</span> Google Pay
-                    </a>
-                    <a
-                      href={appLinks.phonepe || upiLink}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 6,
-                        padding: '8px 10px',
-                        borderRadius: 8,
-                        background: 'rgba(103, 58, 183, 0.15)',
-                        border: '1px solid rgba(103, 58, 183, 0.35)',
-                        color: '#c084fc',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        textDecoration: 'none'
-                      }}
-                    >
-                      <span>⚡</span> PhonePe
-                    </a>
-                    <a
-                      href={appLinks.paytm || upiLink}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 6,
-                        padding: '8px 10px',
-                        borderRadius: 8,
-                        background: 'rgba(0, 186, 242, 0.15)',
-                        border: '1px solid rgba(0, 186, 242, 0.35)',
-                        color: '#38bdf8',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        textDecoration: 'none'
-                      }}
-                    >
-                      <span>⚡</span> Paytm
-                    </a>
+                {/* TAB 1: DIRECT UPI (DEFAULT) */}
+                {upiPaymentTab === 'upi' && (
+                  <div style={{ marginBottom: 16 }}>
+                    {/* Primary Direct Pay Button */}
                     <a
                       href={upiLink}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: 6,
-                        padding: '8px 10px',
-                        borderRadius: 8,
-                        background: 'rgba(16, 185, 129, 0.15)',
-                        border: '1px solid rgba(16, 185, 129, 0.35)',
-                        color: '#34d399',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        textDecoration: 'none'
+                        gap: 8,
+                        padding: '12px 16px',
+                        borderRadius: 10,
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: '#ffffff',
+                        fontSize: '0.95rem',
+                        fontWeight: 800,
+                        textDecoration: 'none',
+                        marginBottom: 12,
+                        boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)',
+                        transition: 'transform 0.1s ease'
                       }}
                     >
-                      <span>⚡</span> Any UPI App
+                      <span>⚡</span> Pay ₹{(pendingOrder.breakdown.totalChargedPaise / 100).toFixed(2)} via Any UPI App
                     </a>
+
+                    <div style={{ fontSize: '0.73rem', color: '#94a3b8', marginBottom: 8, fontWeight: 600 }}>Or Choose Your Preferred UPI App:</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                      <a
+                        href={appLinks.gpay || upiLink}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          padding: '10px 12px',
+                          borderRadius: 8,
+                          background: 'rgba(66, 133, 244, 0.15)',
+                          border: '1px solid rgba(66, 133, 244, 0.35)',
+                          color: '#60a5fa',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          textDecoration: 'none'
+                        }}
+                      >
+                        <span>⚡</span> Google Pay
+                      </a>
+                      <a
+                        href={appLinks.phonepe || upiLink}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          padding: '10px 12px',
+                          borderRadius: 8,
+                          background: 'rgba(103, 58, 183, 0.15)',
+                          border: '1px solid rgba(103, 58, 183, 0.35)',
+                          color: '#c084fc',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          textDecoration: 'none'
+                        }}
+                      >
+                        <span>⚡</span> PhonePe
+                      </a>
+                      <a
+                        href={appLinks.paytm || upiLink}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          padding: '10px 12px',
+                          borderRadius: 8,
+                          background: 'rgba(0, 186, 242, 0.15)',
+                          border: '1px solid rgba(0, 186, 242, 0.35)',
+                          color: '#38bdf8',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          textDecoration: 'none'
+                        }}
+                      >
+                        <span>⚡</span> Paytm
+                      </a>
+                      <a
+                        href={upiLink}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          padding: '10px 12px',
+                          borderRadius: 8,
+                          background: 'rgba(16, 185, 129, 0.15)',
+                          border: '1px solid rgba(16, 185, 129, 0.35)',
+                          color: '#34d399',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          textDecoration: 'none'
+                        }}
+                      >
+                        <span>⚡</span> Other UPI App
+                      </a>
+                    </div>
+                    <div style={{ fontSize: '0.71rem', color: '#64748b', textAlign: 'center', marginTop: 10 }}>
+                      Tap any app above to launch your UPI application directly on this device.
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {/* TAB 2: QR CODE */}
+                {upiPaymentTab === 'qr' && (
+                  <div style={{ marginBottom: 16 }}>
+                    {upiData.qrCode ? (
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{
+                          display: 'inline-block',
+                          padding: 10,
+                          background: '#ffffff',
+                          borderRadius: 14,
+                          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.35)'
+                        }}>
+                          <img
+                            src={upiData.qrCode}
+                            alt="UPI Payment QR Code"
+                            style={{ width: 190, height: 190, display: 'block', borderRadius: 8 }}
+                          />
+                        </div>
+                        <div style={{ fontSize: '0.76rem', color: '#cbd5e1', fontWeight: 600, marginTop: 8 }}>
+                          Scan with any UPI App to Pay
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 6, marginTop: 6, fontSize: '0.7rem', color: '#94a3b8' }}>
+                          <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)' }}>Google Pay</span>
+                          <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)' }}>PhonePe</span>
+                          <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)' }}>Paytm</span>
+                          <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)' }}>BHIM</span>
+                          <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)' }}>Cred</span>
+                        </div>
+                        <div style={{ fontSize: '0.71rem', color: '#64748b', textAlign: 'center', marginTop: 8 }}>
+                          Point your phone camera or open scanner in your banking/UPI app.
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', fontSize: '0.82rem' }}>
+                        Generating UPI QR Code...
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* UTR Verification Section */}
                 <div style={{
