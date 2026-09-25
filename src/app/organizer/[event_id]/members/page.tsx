@@ -48,10 +48,13 @@ interface EventData {
 
 interface SessionData {
   id: string;
+  event_id?: string;
   name: string;
   session_date: string;
-  start_time?: string;
-  end_time?: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  venue_note?: string | null;
+  sort_order?: number;
 }
 
 interface TierData {

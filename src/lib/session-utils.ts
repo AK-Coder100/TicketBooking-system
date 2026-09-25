@@ -7,7 +7,7 @@
 
 export interface EventSession {
   id: string;
-  event_id: string;
+  event_id?: string;
   name: string;
   session_date: string; // 'YYYY-MM-DD' or date string
   start_time?: string | null; // 'HH:MM' (24-hr)
