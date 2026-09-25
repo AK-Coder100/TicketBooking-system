@@ -99,6 +99,7 @@ function OrganizerDashboardInner() {
   const [scanResult, setScanResult] = useState<any>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [scannerModalOpen, setScannerModalOpen] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState<string>('ALL');
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -411,7 +412,12 @@ function OrganizerDashboardInner() {
       const res = await fetch('/api/tenant/scanner/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ qrToken: token.trim(), eventId: selectedEventId, deviceInfo: 'Organizer PWA Scanner' })
+        body: JSON.stringify({
+          qrToken: token.trim(),
+          eventId: selectedEventId,
+          sessionId: selectedSessionId !== 'ALL' ? selectedSessionId : undefined,
+          deviceInfo: 'Organizer PWA Scanner'
+        })
       });
       const data = await res.json();
       setScanResult(data);
@@ -1010,275 +1016,6 @@ function OrganizerDashboardInner() {
               </div>
             </div>
 
-            {/* Featured Session / Active Event Banner Card */}
-            <div style={{
-              background: 'linear-gradient(135deg, rgba(30, 27, 75, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)',
-              border: '1px solid rgba(99, 102, 241, 0.35)',
-              borderRadius: 16,
-              padding: '20px 18px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: 16,
-              marginBottom: 16,
-              boxShadow: '0 8px 32px rgba(99, 102, 241, 0.12)',
-              boxSizing: 'border-box',
-              width: '100%'
-            }}>
-              <div style={{ minWidth: 0, flex: '1 1 240px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{
-                    background: 'rgba(99, 102, 241, 0.25)',
-                    color: '#a5b4fc',
-                    border: '1px solid rgba(99, 102, 241, 0.45)',
-                    padding: '3px 10px',
-                    borderRadius: 9999,
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    flexShrink: 0
-                  }}>
-                    Today's Session
-                  </span>
-                  <span
-                    style={{
-                      fontSize: '0.92rem',
-                      fontWeight: 700,
-                      color: '#e2e8f0',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      maxWidth: '100%'
-                    }}
-                    title={activeSessionName}
-                  >
-                    {activeSessionName}
-                  </span>
-                </div>
-                <h2
-                  style={{
-                    fontSize: '1.3rem',
-                    fontWeight: 800,
-                    color: '#ffffff',
-                    marginTop: 8,
-                    marginBottom: 4,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    maxWidth: '100%'
-                  }}
-                  title={activeEvent?.title || 'परंपरागत डांडिया महोत्सव 2026'}
-                >
-                  {activeEvent?.title || 'परंपरागत डांडिया महोत्सव 2026'}
-                </h2>
-                <div
-                  style={{
-                    fontSize: '0.82rem',
-                    color: '#94a3b8',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    maxWidth: '100%'
-                  }}
-                  title={`Gate 1 & Gate 2 Checkpoints • ${activeEvent?.location || 'KACHERI Club, Town Hall'}`}
-                >
-                  Gate 1 &amp; Gate 2 Checkpoints • {activeEvent?.location || 'KACHERI Club, Town Hall'}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', width: '100%', maxWidth: '320px' }}>
-                <button
-                  type="button"
-                  onClick={() => switchTab('scanner')}
-                  style={{
-                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '10px 18px',
-                    borderRadius: 12,
-                    fontWeight: 700,
-                    fontSize: '0.85rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 20px rgba(99, 102, 241, 0.4)',
-                    flex: '1 1 140px'
-                  }}
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="7" height="7" />
-                    <rect x="14" y="3" width="7" height="7" />
-                    <rect x="14" y="14" width="7" height="7" />
-                    <rect x="3" y="14" width="7" height="7" />
-                  </svg>
-                  Launch Gate Scanner
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => switchTab('profile')}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.06)',
-                    color: '#e2e8f0',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    padding: '10px 16px',
-                    borderRadius: 12,
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    flex: '0 0 auto'
-                  }}
-                >
-                  Roster
-                </button>
-              </div>
-            </div>
-
-            {/* GATE SHIFT OVERVIEW Card */}
-            <div style={{
-              background: '#0d1322',
-              border: '1px solid #1e293b',
-              borderRadius: 16,
-              padding: '18px 18px',
-              marginBottom: 16,
-              boxSizing: 'border-box',
-              width: '100%'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                    <polyline points="2 17 12 22 22 17" />
-                    <polyline points="2 12 12 17 22 12" />
-                  </svg>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#e2e8f0', letterSpacing: '0.04em' }}>
-                    GATE SHIFT OVERVIEW
-                  </span>
-                </div>
-                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                  Shift A (18:00 – 00:00)
-                </span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, width: '100%', boxSizing: 'border-box' }}>
-                {/* Gate 1 */}
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px solid rgba(255, 255, 255, 0.06)',
-                  borderRadius: 12,
-                  padding: '14px 14px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  minWidth: 0,
-                  boxSizing: 'border-box'
-                }}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      GATE 1 (MAIN ENTRANCE)
-                    </div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff', marginTop: 3 }}>
-                      {gate1Admitted} Admitted
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#34d399', fontWeight: 600, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      General &amp; Couple Passes
-                    </div>
-                  </div>
-                  <div style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 9,
-                    background: 'rgba(99, 102, 241, 0.12)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#818cf8',
-                    flexShrink: 0
-                  }}>
-                    🚪
-                  </div>
-                </div>
-
-                {/* Gate 2 */}
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px solid rgba(255, 255, 255, 0.06)',
-                  borderRadius: 12,
-                  padding: '14px 14px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  minWidth: 0,
-                  boxSizing: 'border-box'
-                }}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      GATE 2 (VIP PASS ENTRY)
-                    </div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff', marginTop: 3 }}>
-                      {gate2Admitted} Admitted
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#c084fc', fontWeight: 600, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      Stage &amp; Sponsor Access
-                    </div>
-                  </div>
-                  <div style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 9,
-                    background: 'rgba(168, 85, 247, 0.12)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#c084fc',
-                    flexShrink: 0
-                  }}>
-                    👑
-                  </div>
-                </div>
-
-                {/* Box Office */}
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px solid rgba(255, 255, 255, 0.06)',
-                  borderRadius: 12,
-                  padding: '14px 14px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  minWidth: 0,
-                  boxSizing: 'border-box'
-                }}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      BOX OFFICE COUNTER
-                    </div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff', marginTop: 3 }}>
-                      {pendingCount} Pending
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#fbbf24', fontWeight: 600, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      On-ground pick-ups
-                    </div>
-                  </div>
-                  <div style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 9,
-                    background: 'rgba(245, 158, 11, 0.12)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#fbbf24',
-                    flexShrink: 0
-                  }}>
-                    ❓
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* GATE GUIDELINES & PROTOCOL Card */}
             <div style={{
               background: '#0d1322',
@@ -1709,36 +1446,131 @@ function OrganizerDashboardInner() {
               )} */}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 18 }}>
               {events.map(e => (
-                <div key={e.id} style={{ background: '#0d1322', border: '1px solid #1e293b', borderRadius: 16, overflow: 'hidden', minWidth: 0 }}>
-                  <img src={e.banner_url || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800'} alt={e.title} style={{ height: 150, width: '100%', objectFit: 'cover' }} />
-                  <div style={{ padding: 16 }}>
-                    <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.title}>{e.title}</h3>
-                    <div style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📍 {e.location}</div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                      {e.session_count > 0 && <span className="badge badge-purple" style={{ fontSize: '0.72rem' }}>🎭 {e.session_count} {e.session_count === 1 ? 'Session' : 'Sessions'}</span>}
+                <div
+                  key={e.id}
+                  onClick={() => router.push(`/organizer/${e.id}/members${selectedTenantId ? `?tenantId=${selectedTenantId}` : ''}`)}
+                  style={{
+                    background: '#0d1322',
+                    border: '1px solid #1e293b',
+                    borderRadius: 16,
+                    overflow: 'hidden',
+                    minWidth: 0,
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                  onMouseEnter={el => {
+                    el.currentTarget.style.transform = 'translateY(-3px)';
+                    el.currentTarget.style.borderColor = '#38bdf8';
+                    el.currentTarget.style.boxShadow = '0 12px 28px rgba(56, 189, 248, 0.15)';
+                  }}
+                  onMouseLeave={el => {
+                    el.currentTarget.style.transform = 'translateY(0)';
+                    el.currentTarget.style.borderColor = '#1e293b';
+                    el.currentTarget.style.boxShadow = 'none';
+                  }}
+                >
+                  <div>
+                    <div style={{ position: 'relative', height: 160, width: '100%', overflow: 'hidden' }}>
+                      <img
+                        src={e.banner_url || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800'}
+                        alt={e.title}
+                        style={{ height: '100%', width: '100%', objectFit: 'cover' }}
+                      />
+                      <div style={{
+                        position: 'absolute',
+                        top: 10,
+                        right: 10,
+                        background: 'rgba(9, 13, 22, 0.85)',
+                        backdropFilter: 'blur(8px)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        borderRadius: 8,
+                        padding: '3px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        color: '#38bdf8'
+                      }}>
+                        👥 View Participants →
+                      </div>
                     </div>
 
-                    {e.sessions && e.sessions.length > 0 && (
-                      <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                        {e.sessions.slice(0, 3).map((s: any) => (
-                          <div key={s.id} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '7px 10px', fontSize: '0.78rem' }}>
-                            <div style={{ fontWeight: 600, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
-                            <div style={{ color: '#94a3b8', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              📅 {s.session_date} {s.start_time && `· ${s.start_time}–${s.end_time || '?'}`}
-                              {s.tiers?.length > 0 && <span style={{ color: '#34d399', marginLeft: 6 }}>🎫 {s.tiers.length} pass types</span>}
-                            </div>
-                          </div>
-                        ))}
-                        {e.sessions.length > 3 && <div style={{ fontSize: '0.75rem', color: '#64748b', paddingLeft: 4 }}>+{e.sessions.length - 3} more sessions</div>}
+                    <div style={{ padding: 16 }}>
+                      <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }} title={e.title}>
+                        {e.title}
+                      </h3>
+                      <div style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        📍 {e.location}
                       </div>
-                    )}
+                      <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                        {e.session_count > 0 && (
+                          <span className="badge badge-purple" style={{ fontSize: '0.72rem' }}>
+                            🎭 {e.session_count} {e.session_count === 1 ? 'Session' : 'Sessions'}
+                          </span>
+                        )}
+                        <span style={{
+                          background: 'rgba(56, 189, 248, 0.12)',
+                          color: '#38bdf8',
+                          border: '1px solid rgba(56, 189, 248, 0.25)',
+                          borderRadius: 6,
+                          padding: '2px 8px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700
+                        }}>
+                          🎫 {e.tickets_sold || 0} Registered
+                        </span>
+                      </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 12, borderTop: '1px solid #1e293b', fontSize: '0.82rem' }}>
-                      <span>Sold: <b style={{ color: '#34d399' }}>{e.tickets_sold || 0}</b></span>
+                      {e.sessions && e.sessions.length > 0 && (
+                        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          {e.sessions.slice(0, 3).map((s: any) => (
+                            <div key={s.id} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '7px 10px', fontSize: '0.78rem' }}>
+                              <div style={{ fontWeight: 600, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
+                              <div style={{ color: '#94a3b8', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                📅 {s.session_date} {s.start_time && `· ${s.start_time}–${s.end_time || '?'}`}
+                                {s.tiers?.length > 0 && <span style={{ color: '#34d399', marginLeft: 6 }}>🎫 {s.tiers.length} tiers</span>}
+                              </div>
+                            </div>
+                          ))}
+                          {e.sessions.length > 3 && <div style={{ fontSize: '0.75rem', color: '#64748b', paddingLeft: 4 }}>+{e.sessions.length - 3} more sessions</div>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '0 16px 16px 16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingTop: 10, borderTop: '1px solid #1e293b', fontSize: '0.82rem' }}>
+                      <span>Sold Passes: <b style={{ color: '#34d399' }}>{e.tickets_sold || 0}</b></span>
                       <span>Checked In: <b style={{ color: '#a5b4fc' }}>{e.checked_in_count || 0}</b></span>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={(evt) => {
+                        evt.stopPropagation();
+                        router.push(`/organizer/${e.id}/members${selectedTenantId ? `?tenantId=${selectedTenantId}` : ''}`);
+                      }}
+                      style={{
+                        width: '100%',
+                        background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.15) 0%, rgba(99, 102, 241, 0.2) 100%)',
+                        border: '1px solid rgba(56, 189, 248, 0.35)',
+                        color: '#38bdf8',
+                        padding: '8px 14px',
+                        borderRadius: 10,
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6
+                      }}
+                    >
+                      👥 View Participants Roster →
+                    </button>
                   </div>
                 </div>
               ))}
@@ -2381,11 +2213,46 @@ function OrganizerDashboardInner() {
                   whiteSpace: 'nowrap'
                 }}
                 value={selectedEventId}
-                onChange={e => setSelectedEventId(e.target.value)}
+                onChange={e => {
+                  setSelectedEventId(e.target.value);
+                  setSelectedSessionId('ALL');
+                }}
               >
                 {events.map(e => <option key={e.id} value={e.id}>{e.title}</option>)}
               </select>
             </div>
+
+            {/* Active Gate Session Selector */}
+            {activeEvent?.sessions && activeEvent.sessions.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+                <span style={{ fontSize: '0.82rem', color: '#38bdf8', fontWeight: 700, flexShrink: 0 }}>Active Session:</span>
+                <select
+                  className="form-control"
+                  style={{
+                    width: '100%',
+                    flex: 1,
+                    minWidth: 0,
+                    background: '#1e293b',
+                    border: '1px solid #38bdf8',
+                    color: '#34d399',
+                    fontWeight: 700,
+                    padding: '7px 10px',
+                    fontSize: '0.82rem',
+                    borderRadius: 8,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                  value={selectedSessionId}
+                  onChange={e => setSelectedSessionId(e.target.value)}
+                >
+                  <option value="ALL">🌐 All Event Sessions</option>
+                  {activeEvent.sessions.map((s: any) => (
+                    <option key={s.id} value={s.id}>🎭 {s.name} ({s.session_date})</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 16, width: '100%', boxSizing: 'border-box' }}>
               {/* Camera & Input Panel */}

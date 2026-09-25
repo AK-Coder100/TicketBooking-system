@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getSession();
     const body = await request.json();
-    const { qrToken, eventId, deviceInfo } = body;
+    const { qrToken, eventId, sessionId, expectedSessionId, deviceInfo } = body;
 
     if (!qrToken) {
       return NextResponse.json({ success: false, error: 'QR token is required' }, { status: 400 });
@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
     const result = await verifyAndScanTicket({
       qrToken,
       expectedEventId: eventId,
+      expectedSessionId: sessionId || expectedSessionId,
       adminId: session?.name || session?.email || 'gate_scanner',
       ip,
       deviceInfo: deviceInfo || 'Mobile PWA Camera'

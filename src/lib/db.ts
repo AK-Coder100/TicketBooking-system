@@ -222,6 +222,10 @@ export async function initSchema(): Promise<void> {
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS tier_id VARCHAR(100);
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS event_title VARCHAR(255);
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_reference TEXT;
+
+      -- Update ticket_audit_logs check constraint to support all organizer action types
+      ALTER TABLE ticket_audit_logs DROP CONSTRAINT IF EXISTS ticket_audit_logs_action_type_check;
+      ALTER TABLE ticket_audit_logs ADD CONSTRAINT ticket_audit_logs_action_type_check CHECK (action_type IN ('WHATSAPP_SENT', 'DOWNLOADED', 'SCAN_ATTEMPT', 'OVERRIDE_CHECKIN', 'MANUAL_CHECKIN', 'RESET_CHECKIN'));
     `);
 
     await seedData();

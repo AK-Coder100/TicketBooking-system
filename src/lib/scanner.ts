@@ -5,12 +5,14 @@ import crypto from 'node:crypto';
 export async function verifyAndScanTicket({
   qrToken,
   expectedEventId,
+  expectedSessionId,
   adminId = 'gate_operator',
   ip = '127.0.0.1',
   deviceInfo = 'Mobile Camera PWA'
 }: {
   qrToken: string;
   expectedEventId?: string;
+  expectedSessionId?: string;
   adminId?: string;
   ip?: string;
   deviceInfo?: string;
@@ -29,13 +31,17 @@ export async function verifyAndScanTicket({
 
   const { ticketId, eventId } = cryptoResult.payload;
 
-  // 2. Fetch ticket with tier and event
+  // 2. Fetch ticket with tier, session and event
   const ticket: any = await db.prepare(`
-    SELECT t.*, o.payment_status, o.customer_phone, o.customer_email, tt.name as tier_name, tt.event_id, e.title as event_title
+    SELECT t.*, o.payment_status, o.customer_phone, o.customer_email, 
+           tt.name as tier_name, tt.event_id, tt.session_id,
+           e.title as event_title,
+           es.name as session_name, es.session_date, es.start_time, es.end_time
     FROM tickets t
     JOIN orders o ON t.order_id = o.id
     JOIN ticket_tiers tt ON t.tier_id = tt.id
     JOIN events e ON tt.event_id = e.id
+    LEFT JOIN event_sessions es ON tt.session_id = es.id
     WHERE t.id = ?
   `).get(ticketId);
 
@@ -73,6 +79,67 @@ export async function verifyAndScanTicket({
       color: 'red',
       reason: `Wrong Event! This ticket is for "${ticket.event_title}", not the selected event.`,
       ticketEvent: ticket.event_title
+    };
+  }
+
+  // 4. Automatic Date & Time Active Session Check
+  const eventSessions: any[] = await db.prepare(`
+    SELECT * FROM event_sessions WHERE event_id = ? ORDER BY sort_order ASC, session_date ASC
+  `).all(ticket.event_id);
+
+  let targetSessionId = expectedSessionId;
+  let activeSessionObj: any = null;
+
+  if (eventSessions && eventSessions.length > 1) {
+    // If expectedSessionId was not provided or set to 'AUTO', resolve by current date and time
+    if (!targetSessionId || targetSessionId === 'AUTO') {
+      const { getActiveSessionByTime } = await import('./session-utils');
+      const timeResult = getActiveSessionByTime(eventSessions, new Date());
+      activeSessionObj = timeResult.activeSession;
+      targetSessionId = activeSessionObj?.id;
+    } else if (targetSessionId !== 'ALL') {
+      activeSessionObj = eventSessions.find(s => s.id === targetSessionId);
+    }
+  }
+
+  if (targetSessionId && targetSessionId !== 'ALL' && ticket.session_id && ticket.session_id !== targetSessionId) {
+    const auditId = `aud_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    await db.prepare(`
+      INSERT INTO ticket_audit_logs (id, ticket_id, action_type, metadata, created_at)
+      VALUES (?, ?, 'SCAN_ATTEMPT', ?, ?)
+    `).run(
+      auditId,
+      ticket.id,
+      JSON.stringify({
+        status: 'WRONG_SESSION',
+        expectedSessionId: targetSessionId,
+        actualSessionId: ticket.session_id,
+        sessionName: ticket.session_name,
+        sessionDate: ticket.session_date,
+        activeSessionResolved: activeSessionObj?.name,
+        adminId,
+        ip,
+        deviceInfo
+      }),
+      now
+    );
+
+    const activeShowName = activeSessionObj ? `"${activeSessionObj.name}" (${activeSessionObj.session_date} ${activeSessionObj.start_time || ''})` : 'another time slot';
+    return {
+      status: 'WRONG_SESSION',
+      color: 'red',
+      reason: `Inactive Show! This pass is valid for "${ticket.session_name || 'Show'}" (${ticket.session_date || 'scheduled date'}), but the currently active show by date & time is ${activeShowName}.`,
+      ticket: {
+        id: ticket.id,
+        attendeeName: ticket.attendee_name,
+        attendeeAge: ticket.attendee_age,
+        tierName: ticket.tier_name,
+        eventTitle: ticket.event_title,
+        sessionName: ticket.session_name,
+        sessionDate: ticket.session_date,
+        activeSessionName: activeSessionObj?.name
+      },
+      canOverride: true
     };
   }
 

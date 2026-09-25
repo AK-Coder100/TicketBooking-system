@@ -161,7 +161,7 @@ async function resetDb() {
       CREATE TABLE IF NOT EXISTS ticket_audit_logs (
         id TEXT PRIMARY KEY,
         ticket_id TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
-        action_type TEXT CHECK(action_type IN ('WHATSAPP_SENT', 'DOWNLOADED', 'SCAN_ATTEMPT', 'OVERRIDE_CHECKIN')) NOT NULL,
+        action_type TEXT CHECK(action_type IN ('WHATSAPP_SENT', 'DOWNLOADED', 'SCAN_ATTEMPT', 'OVERRIDE_CHECKIN', 'MANUAL_CHECKIN', 'RESET_CHECKIN')) NOT NULL,
         metadata TEXT,
         created_at TEXT NOT NULL
       );
