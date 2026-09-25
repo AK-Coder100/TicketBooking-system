@@ -48,6 +48,7 @@ export default function TenantCheckoutPage() {
   const [pendingOrder, setPendingOrder] = useState<any>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [upiPaymentTab, setUpiPaymentTab] = useState<'upi' | 'qr'>('upi');
+  const [hasInitiatedPayment, setHasInitiatedPayment] = useState(false);
   const [confirmedOrder, setConfirmedOrder] = useState<any>(null);
   const [confirmedTickets, setConfirmedTickets] = useState<any[]>([]);
   const [qrCodeMap, setQrCodeMap] = useState<Record<string, string>>({});
@@ -304,6 +305,13 @@ export default function TenantCheckoutPage() {
 
       setPendingOrder(data);
       setUpiPaymentTab('upi');
+      let wasInitiated = false;
+      try {
+        if (typeof window !== 'undefined' && localStorage.getItem('payment_initiated_' + data.orderId) === 'true') {
+          wasInitiated = true;
+        }
+      } catch (e) {}
+      setHasInitiatedPayment(wasInitiated);
       setShowPaymentModal(true);
     } catch (err: any) {
       setErrorMsg(err.message || 'Payment initiation error');
@@ -374,6 +382,19 @@ export default function TenantCheckoutPage() {
       cleanUtr ? `utr_${cleanUtr}` : `upi_pay_${Date.now()}`,
       cleanUtr || undefined
     );
+  };
+
+  const handleServerPayRedirect = (appChoice = 'any') => {
+    if (!pendingOrder) return;
+    setHasInitiatedPayment(true);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('payment_initiated_' + pendingOrder.orderId, 'true');
+      }
+    } catch (e) {}
+
+    const serverPayUrl = `/api/client/orders/${pendingOrder.orderId}/pay?app=${appChoice}`;
+    window.location.href = serverPayUrl;
   };
 
   const handleCopyUpiId = (upiId: string) => {
@@ -832,32 +853,36 @@ export default function TenantCheckoutPage() {
                 {upiPaymentTab === 'upi' && (
                   <div style={{ marginBottom: 16 }}>
                     {/* Primary Direct Pay Button */}
-                    <a
-                      href={upiLink}
+                    <button
+                      type="button"
+                      onClick={() => handleServerPayRedirect('any')}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: 8,
+                        width: '100%',
                         padding: '12px 16px',
                         borderRadius: 10,
                         background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                         color: '#ffffff',
                         fontSize: '0.95rem',
                         fontWeight: 800,
-                        textDecoration: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
                         marginBottom: 12,
                         boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)',
                         transition: 'transform 0.1s ease'
                       }}
                     >
                       <span>⚡</span> Pay ₹{(pendingOrder.breakdown.totalChargedPaise / 100).toFixed(2)} via Any UPI App
-                    </a>
+                    </button>
 
                     <div style={{ fontSize: '0.73rem', color: '#94a3b8', marginBottom: 8, fontWeight: 600 }}>Or Choose Your Preferred UPI App:</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-                      <a
-                        href={appLinks.gpay || upiLink}
+                      <button
+                        type="button"
+                        onClick={() => handleServerPayRedirect('gpay')}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -870,13 +895,14 @@ export default function TenantCheckoutPage() {
                           color: '#60a5fa',
                           fontSize: '0.8rem',
                           fontWeight: 700,
-                          textDecoration: 'none'
+                          cursor: 'pointer'
                         }}
                       >
                         <span>⚡</span> Google Pay
-                      </a>
-                      <a
-                        href={appLinks.phonepe || upiLink}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleServerPayRedirect('phonepe')}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -889,13 +915,14 @@ export default function TenantCheckoutPage() {
                           color: '#c084fc',
                           fontSize: '0.8rem',
                           fontWeight: 700,
-                          textDecoration: 'none'
+                          cursor: 'pointer'
                         }}
                       >
                         <span>⚡</span> PhonePe
-                      </a>
-                      <a
-                        href={appLinks.paytm || upiLink}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleServerPayRedirect('paytm')}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -908,13 +935,14 @@ export default function TenantCheckoutPage() {
                           color: '#38bdf8',
                           fontSize: '0.8rem',
                           fontWeight: 700,
-                          textDecoration: 'none'
+                          cursor: 'pointer'
                         }}
                       >
                         <span>⚡</span> Paytm
-                      </a>
-                      <a
-                        href={upiLink}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleServerPayRedirect('any')}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -927,14 +955,14 @@ export default function TenantCheckoutPage() {
                           color: '#34d399',
                           fontSize: '0.8rem',
                           fontWeight: 700,
-                          textDecoration: 'none'
+                          cursor: 'pointer'
                         }}
                       >
                         <span>⚡</span> Other UPI App
-                      </a>
+                      </button>
                     </div>
                     <div style={{ fontSize: '0.71rem', color: '#64748b', textAlign: 'center', marginTop: 10 }}>
-                      Tap any app above to launch your UPI application directly on this device.
+                      Tap any app above to securely launch your UPI application directly on this device.
                     </div>
                   </div>
                 )}
@@ -967,8 +995,30 @@ export default function TenantCheckoutPage() {
                           <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)' }}>BHIM</span>
                           <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.06)' }}>Cred</span>
                         </div>
-                        <div style={{ fontSize: '0.71rem', color: '#64748b', textAlign: 'center', marginTop: 8 }}>
-                          Point your phone camera or open scanner in your banking/UPI app.
+                        <div style={{ marginTop: 12 }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setHasInitiatedPayment(true);
+                              try {
+                                if (typeof window !== 'undefined') {
+                                  localStorage.setItem('payment_initiated_' + pendingOrder.orderId, 'true');
+                                }
+                              } catch (e) {}
+                            }}
+                            style={{
+                              background: 'rgba(99, 102, 241, 0.18)',
+                              border: '1px solid rgba(99, 102, 241, 0.4)',
+                              color: '#a5b4fc',
+                              padding: '8px 16px',
+                              borderRadius: 8,
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <span>👉</span> I Have Scanned &amp; Paid in UPI App
+                          </button>
                         </div>
                       </div>
                     ) : (
@@ -979,73 +1029,128 @@ export default function TenantCheckoutPage() {
                   </div>
                 )}
 
-                {/* UTR Verification Section */}
-                <div style={{
-                  padding: 12,
-                  borderRadius: 10,
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  marginBottom: 14
-                }}>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
-                    Confirm Payment (12-Digit UPI UTR / Ref)
-                  </label>
-                  <p style={{ fontSize: '0.71rem', color: '#94a3b8', margin: '0 0 8px 0' }}>
-                    After completing payment in your UPI app, paste the 12-digit UTR/RRN number (or confirm below):
-                  </p>
-                  <input
-                    type="text"
-                    maxLength={12}
-                    placeholder="e.g. 423819283719 (12 digits)"
-                    value={enteredUtr}
-                    onChange={(e) => setEnteredUtr(e.target.value.replace(/[^0-9]/g, ''))}
-                    className="form-control"
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      fontSize: '0.85rem',
-                      fontFamily: 'monospace',
-                      borderRadius: 8,
-                      background: 'rgba(15, 23, 42, 0.8)',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      color: '#ffffff'
-                    }}
-                  />
-                </div>
-
-                {errorMsg && (
+                {/* UTR Verification Section - Only shown after user clicks Pay */}
+                {hasInitiatedPayment ? (
                   <div style={{
-                    padding: '8px 12px',
-                    borderRadius: 8,
-                    background: 'rgba(239, 68, 68, 0.15)',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                    color: '#fca5a5',
-                    fontSize: '0.78rem',
-                    marginBottom: 12
+                    padding: 14,
+                    borderRadius: 12,
+                    background: 'rgba(15, 23, 42, 0.85)',
+                    border: '1px solid rgba(16, 185, 129, 0.35)',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                    marginTop: 8,
+                    marginBottom: 14
                   }}>
-                    {errorMsg}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{
+                        background: 'rgba(16, 185, 129, 0.2)',
+                        color: '#34d399',
+                        border: '1px solid rgba(16, 185, 129, 0.4)',
+                        padding: '2px 8px',
+                        borderRadius: 6,
+                        fontSize: '0.7rem',
+                        fontWeight: 800,
+                        textTransform: 'uppercase'
+                      }}>
+                        Payment Initiated
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleServerPayRedirect('any')}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#818cf8',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          padding: 0
+                        }}
+                      >
+                        ↺ Re-open UPI App
+                      </button>
+                    </div>
+
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
+                      Confirm Payment (12-Digit UPI UTR / Ref)
+                    </label>
+                    <p style={{ fontSize: '0.71rem', color: '#94a3b8', margin: '0 0 10px 0', lineHeight: 1.4 }}>
+                      After completing payment in your UPI app, paste the 12-digit UTR/RRN number (or confirm below):
+                    </p>
+
+                    <input
+                      type="text"
+                      maxLength={12}
+                      placeholder="e.g. 423819283719 (12 digits)"
+                      value={enteredUtr}
+                      onChange={(e) => setEnteredUtr(e.target.value.replace(/[^0-9]/g, ''))}
+                      className="form-control"
+                      style={{
+                        width: '100%',
+                        padding: '9px 12px',
+                        fontSize: '0.88rem',
+                        fontFamily: 'monospace',
+                        borderRadius: 8,
+                        background: 'rgba(15, 23, 42, 0.9)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        color: '#ffffff',
+                        marginBottom: 10
+                      }}
+                    />
+
+                    {errorMsg && (
+                      <div style={{
+                        padding: '8px 12px',
+                        borderRadius: 8,
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        color: '#fca5a5',
+                        fontSize: '0.78rem',
+                        marginBottom: 10
+                      }}>
+                        {errorMsg}
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        fontSize: '0.92rem',
+                        fontWeight: 700,
+                        borderRadius: 8,
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)'
+                      }}
+                      onClick={handleVerifyUpiPayment}
+                      disabled={loading}
+                    >
+                      {loading ? 'Verifying UPI...' : '✅ I Have Paid — Confirm & Get Tickets'}
+                    </button>
+
+                    <div style={{ textAlign: 'center', marginTop: 10, fontSize: '0.7rem', color: '#64748b' }}>
+                      Entry passes with QR code will be generated instantly and dispatched to your WhatsApp.
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '14px 12px',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px dashed rgba(255, 255, 255, 0.1)',
+                    borderRadius: 10,
+                    marginTop: 4,
+                    marginBottom: 14
+                  }}>
+                    <div style={{ fontSize: '0.78rem', color: '#cbd5e1', fontWeight: 600 }}>
+                      👆 Click a payment button above to open your UPI app.
+                    </div>
+                    <div style={{ fontSize: '0.71rem', color: '#64748b', marginTop: 3 }}>
+                      The confirmation button will unlock once payment is initiated.
+                    </div>
                   </div>
                 )}
-
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    fontSize: '0.92rem',
-                    fontWeight: 700,
-                    borderRadius: 8
-                  }}
-                  onClick={handleVerifyUpiPayment}
-                  disabled={loading}
-                >
-                  {loading ? 'Verifying UPI...' : '✅ I Have Paid — Confirm & Get Tickets'}
-                </button>
-
-                <div style={{ textAlign: 'center', marginTop: 10, fontSize: '0.7rem', color: '#64748b' }}>
-                  Entry passes with QR code will be generated instantly and dispatched to your WhatsApp.
-                </div>
               </div>
             </div>
           </div>
