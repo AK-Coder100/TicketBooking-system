@@ -377,7 +377,7 @@ export default function TenantCheckoutPage() {
     );
   };
 
-  const handleLaunchUpi = (targetUrl?: string) => {
+  const handleLaunchUpi = async (targetUrl?: string) => {
     if (!pendingOrder) return;
     setHasInitiatedPayment(true);
     try {
@@ -385,9 +385,16 @@ export default function TenantCheckoutPage() {
         localStorage.setItem('payment_initiated_' + pendingOrder.orderId, 'true');
       }
     } catch (e) { }
+
     if (targetUrl) {
       window.location.href = targetUrl;
     }
+
+    // Automatically confirm and finalize payment upon clicking Pay
+    await finalizePayment(
+      pendingOrder.orderId,
+      `upi_${pendingOrder.orderId}`
+    );
   };
 
   const handleCopyUpiId = (upiId: string) => {
@@ -844,40 +851,43 @@ export default function TenantCheckoutPage() {
 
                 {/* TAB 1: DIRECT UPI (DEFAULT) */}
                 {upiPaymentTab === 'upi' && (
-                  <div style={{ marginBottom: 16 }}>
-                    {/* Primary Direct Pay Button */}
-                    <a
-                      href={upiLink}
+                  <div style={{ marginBottom: 12 }}>
+                    <button
+                      type="button"
                       onClick={() => handleLaunchUpi(upiLink)}
+                      disabled={loading}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: 8,
                         width: '100%',
-                        padding: '12px 16px',
+                        padding: '14px 16px',
                         borderRadius: 10,
                         background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                         color: '#ffffff',
-                        fontSize: '0.95rem',
+                        fontSize: '1rem',
                         fontWeight: 800,
-                        textDecoration: 'none',
                         border: 'none',
                         cursor: 'pointer',
-                        marginBottom: 12,
+                        marginBottom: 10,
                         boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)',
                         transition: 'transform 0.1s ease',
                         boxSizing: 'border-box'
                       }}
                     >
-                      <span>⚡</span> Pay ₹{(pendingOrder.breakdown.totalChargedPaise / 100).toFixed(2)}
-                    </a>
+                      <span>⚡</span> {loading ? 'Processing Payment...' : `Pay ₹${(pendingOrder.breakdown.totalChargedPaise / 100).toFixed(2)}`}
+                    </button>
+
+                    <div style={{ textAlign: 'center', fontSize: '0.72rem', color: '#64748b' }}>
+                      Clicking Pay will open your UPI app and automatically submit your booking confirmation.
+                    </div>
                   </div>
                 )}
 
                 {/* TAB 2: QR CODE */}
                 {upiPaymentTab === 'qr' && (
-                  <div style={{ marginBottom: 16 }}>
+                  <div style={{ marginBottom: 12 }}>
                     {upiData.qrCode ? (
                       <div style={{ textAlign: 'center' }}>
                         <div style={{
@@ -893,9 +903,30 @@ export default function TenantCheckoutPage() {
                             style={{ width: 190, height: 190, display: 'block', borderRadius: 8 }}
                           />
                         </div>
-                        <div style={{ fontSize: '0.76rem', color: '#cbd5e1', fontWeight: 600, marginTop: 8 }}>
+                        <div style={{ fontSize: '0.76rem', color: '#cbd5e1', fontWeight: 600, marginTop: 8, marginBottom: 12 }}>
                           Scan with any UPI App to Pay
                         </div>
+
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          style={{
+                            width: '100%',
+                            padding: '12px',
+                            fontSize: '0.92rem',
+                            fontWeight: 700,
+                            borderRadius: 10,
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: '#ffffff',
+                            border: 'none',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)'
+                          }}
+                          onClick={handleVerifyUpiPayment}
+                          disabled={loading}
+                        >
+                          {loading ? 'Confirming Payment...' : 'I Have Scanned & Paid'}
+                        </button>
                       </div>
                     ) : (
                       <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', fontSize: '0.82rem' }}>
@@ -905,122 +936,17 @@ export default function TenantCheckoutPage() {
                   </div>
                 )}
 
-                {/* Payment Confirmation Section - Always shown in QR mode; shown after pay click in UPI mode */}
-                {(hasInitiatedPayment || upiPaymentTab === 'qr') ? (
+                {errorMsg && (
                   <div style={{
-                    padding: 14,
-                    borderRadius: 12,
-                    background: 'rgba(15, 23, 42, 0.85)',
-                    border: '1px solid rgba(16, 185, 129, 0.35)',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                    marginTop: 8,
-                    marginBottom: 14
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#fca5a5',
+                    fontSize: '0.78rem',
+                    marginTop: 10
                   }}>
-                    {upiPaymentTab === 'upi' ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <span style={{
-                          background: 'rgba(16, 185, 129, 0.2)',
-                          color: '#34d399',
-                          border: '1px solid rgba(16, 185, 129, 0.4)',
-                          padding: '2px 8px',
-                          borderRadius: 6,
-                          fontSize: '0.7rem',
-                          fontWeight: 800,
-                          textTransform: 'uppercase'
-                        }}>
-                          Payment Initiated
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleLaunchUpi(upiLink)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#818cf8',
-                            fontSize: '0.72rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            padding: 0
-                          }}
-                        >
-                          ↺ Re-open UPI App
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                        <span style={{
-                          background: 'rgba(16, 185, 129, 0.15)',
-                          color: '#34d399',
-                          border: '1px solid rgba(16, 185, 129, 0.35)',
-                          padding: '3px 10px',
-                          borderRadius: 6,
-                          fontSize: '0.7rem',
-                          fontWeight: 800,
-                          textTransform: 'uppercase'
-                        }}>
-                          Scan &amp; Confirm
-                        </span>
-                      </div>
-                    )}
-
-                    <div style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: '6px 0 12px 0', lineHeight: 1.4, textAlign: 'center' }}>
-                      {upiPaymentTab === 'qr'
-                        ? 'After scanning the QR code and completing payment, click below to confirm:'
-                        : 'Once you have completed the payment in your UPI app, click below to confirm your booking:'}
-                    </div>
-
-                    {errorMsg && (
-                      <div style={{
-                        padding: '8px 12px',
-                        borderRadius: 8,
-                        background: 'rgba(239, 68, 68, 0.15)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        color: '#fca5a5',
-                        fontSize: '0.78rem',
-                        marginBottom: 10
-                      }}>
-                        {errorMsg}
-                      </div>
-                    )}
-
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        fontSize: '0.92rem',
-                        fontWeight: 700,
-                        borderRadius: 8,
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)'
-                      }}
-                      onClick={handleVerifyUpiPayment}
-                      disabled={loading}
-                    >
-                      {loading ? 'Verifying UPI...' : '✅ I Have Paid — Confirm & Get Tickets'}
-                    </button>
-
-                    <div style={{ textAlign: 'center', marginTop: 10, fontSize: '0.7rem', color: '#64748b' }}>
-                      Entry passes with QR code will be generated instantly and dispatched to your WhatsApp.
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{
-                    textAlign: 'center',
-                    padding: '14px 12px',
-                    background: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px dashed rgba(255, 255, 255, 0.1)',
-                    borderRadius: 10,
-                    marginTop: 4,
-                    marginBottom: 14
-                  }}>
-                    <div style={{ fontSize: '0.78rem', color: '#cbd5e1', fontWeight: 600 }}>
-                      👆 Click a payment button above to open your UPI app.
-                    </div>
-                    <div style={{ fontSize: '0.71rem', color: '#64748b', marginTop: 3 }}>
-                      The confirmation button will unlock once payment is initiated.
-                    </div>
+                    {errorMsg}
                   </div>
                 )}
               </div>
