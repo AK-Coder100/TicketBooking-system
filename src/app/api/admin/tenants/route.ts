@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       tenantId,
       cleanSlug,
       name,
-      gateway_account_id || `acc_${cleanSlug}_split`,
+      gateway_account_id?.trim() || null,
       fee_bearer_type || 'USER',
       parseInt(default_platform_fee, 10) || 200,
       is_gateway_fee_passed_to_customer != null ? (is_gateway_fee_passed_to_customer ? 1 : 0) : 1,

@@ -21,8 +21,10 @@ export default function SuperAdminDashboard() {
     default_platform_fee: 200,
     fee_bearer_type: 'USER',
     contact_email: '',
+    contact_phone: '',
     admin_password: 'organizer123'
   });
+  const [showTenantPassword, setShowTenantPassword] = useState(false);
 
   // Gateway config state
   const [activeGateway, setActiveGateway] = useState('UPI');
@@ -129,6 +131,7 @@ export default function SuperAdminDashboard() {
           default_platform_fee: 200,
           fee_bearer_type: 'USER',
           contact_email: '',
+          contact_phone: '',
           admin_password: 'organizer123'
         });
         loadTenants();
@@ -253,7 +256,7 @@ export default function SuperAdminDashboard() {
               style={{ justifyContent: 'flex-start' }}
               onClick={() => setActiveTab('payments')}
             >
-              💳 Payment & Split Rules
+              ⚡ UPI &amp; Commission Settings
             </button>
           </div>
         </aside>
@@ -622,8 +625,8 @@ export default function SuperAdminDashboard() {
                     <tr style={{ borderBottom: '1px solid var(--border-glass)', textAlign: 'left', color: 'var(--text-dim)' }}>
                       <th style={{ padding: 10 }}>Organizer Name</th>
                       <th style={{ padding: 10 }}>Slug / Box Office</th>
-                      <th style={{ padding: 10 }}>Gateway Account ID</th>
-                      <th style={{ padding: 10 }}>Surcharge Rule</th>
+                      <th style={{ padding: 10 }}>Merchant UPI ID</th>
+                      <th style={{ padding: 10 }}>Fee Bearer</th>
                       <th style={{ padding: 10 }}>Platform Cut</th>
                       <th style={{ padding: 10 }}>Status</th>
                       <th style={{ padding: 10 }}>Action</th>
@@ -634,7 +637,7 @@ export default function SuperAdminDashboard() {
                       <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                         <td style={{ padding: 12 }}><b>{t.name}</b></td>
                         <td style={{ padding: 12 }}><a href={`/${t.slug}`} target="_blank" style={{ color: '#818cf8' }}>/{t.slug} ↗</a></td>
-                        <td style={{ padding: 12 }}><code>{t.gateway_account_id}</code></td>
+                        <td style={{ padding: 12 }}><code>{t.gateway_account_id || 'Default UPI MID'}</code></td>
                         <td style={{ padding: 12 }}>
                           <span className={`badge ${t.fee_bearer_type === 'USER' ? 'badge-purple' : 'badge-yellow'}`}>
                             {t.fee_bearer_type === 'USER' ? 'Client Pays Surcharge' : 'Organizer Absorbs'}
@@ -662,15 +665,15 @@ export default function SuperAdminDashboard() {
 
           {activeTab === 'payments' && (
             <div>
-              <h2 style={{ fontSize: '1.6rem', marginBottom: 6 }}>Payment Gateway Split & Surcharge Settings</h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 24 }}>Switch gateway adapters and configure platform commission settlement rules.</p>
+              <h2 style={{ fontSize: '1.6rem', marginBottom: 6 }}>⚡ Direct UPI &amp; Platform Commission Settings</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 24 }}>All payments run via Direct UPI (Zero gateway fees / instant settlement via UpiService).</p>
 
               <div className="glass-panel" style={{ padding: 28, maxWidth: 640 }}>
                 <div className="form-group">
-                  <label className="form-label">Active Platform Payment Mode</label>
-                  <select className="form-control" value={activeGateway} onChange={(e) => setActiveGateway(e.target.value)}>
-                    <option value="UPI">Direct UPI Service (Zero Gateway Fee / Instant Settlement via UpiService)</option>
-                  </select>
+                  <label className="form-label">Active Payment Mode</label>
+                  <div style={{ padding: '10px 14px', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: 8, color: '#34d399', fontWeight: 700, fontSize: '0.9rem' }}>
+                    ⚡ Direct UPI (UPI Intent Deeplinking &amp; Dynamic QR Code)
+                  </div>
                 </div>
 
                 <div className="form-group">
@@ -685,7 +688,7 @@ export default function SuperAdminDashboard() {
                 </div>
 
                 <button className="btn btn-primary" style={{ marginTop: 14 }} onClick={handleSaveSettings}>
-                  Save Gateway Rules
+                  Save Settings
                 </button>
               </div>
             </div>
@@ -695,46 +698,142 @@ export default function SuperAdminDashboard() {
 
       {/* Create Tenant Modal */}
       {showCreateModal && (
-        <div className="modal-backdrop">
-          <div className="modal-dialog">
-            <div className="modal-header">
-              <h3>Create Event Organizer Tenant</h3>
+        <div className="modal-backdrop" style={{ overflowY: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div className="modal-dialog" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column', width: '100%', maxWidth: 680, overflow: 'hidden' }}>
+            <div className="modal-header" style={{ flexShrink: 0 }}>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800 }}>Create Event Organizer Tenant</h3>
               <button onClick={() => setShowCreateModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
             </div>
-            <form onSubmit={handleCreateTenant}>
-              <div className="modal-body">
+            <form onSubmit={handleCreateTenant} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <div className="modal-body" style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: 24 }}>
                 <div className="form-group">
                   <label className="form-label">Organizer / Brand Name *</label>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="e.g. Tomorrowland India"
+                    placeholder="e.g. SR Production"
                     value={newTenant.name}
                     onChange={(e) => setNewTenant({ ...newTenant, name: e.target.value })}
                     required
                   />
                 </div>
+
                 <div className="form-group">
                   <label className="form-label">Unique Slug (URL) *</label>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="e.g. tomorrowland"
+                    placeholder="e.g. dandiya-26"
                     value={newTenant.slug}
                     onChange={(e) => setNewTenant({ ...newTenant, slug: e.target.value })}
                     required
                   />
+                  <small style={{ color: 'var(--text-dim)', fontSize: '0.72rem', marginTop: 3 }}>
+                    Public URL: /{newTenant.slug || 'slug'}
+                  </small>
                 </div>
+
                 <div className="form-group">
-                  <label className="form-label">Gateway Linked Account ID</label>
+                  <label className="form-label">Organizer Login Email *</label>
+                  <input
+                    type="email"
+                    className="form-control"
+                    placeholder="e.g. organizer@example.com"
+                    value={newTenant.contact_email}
+                    onChange={(e) => setNewTenant({ ...newTenant, contact_email: e.target.value })}
+                    required
+                  />
+                  <small style={{ color: 'var(--text-dim)', fontSize: '0.72rem', marginTop: 3 }}>
+                    This will be the login username for the Organizer Portal (/organizer/login).
+                  </small>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Organizer Admin Password *</label>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <input
+                      type={showTenantPassword ? 'text' : 'password'}
+                      className="form-control"
+                      style={{ width: '100%', paddingRight: 42 }}
+                      placeholder="Password for organizer login"
+                      value={newTenant.admin_password}
+                      onChange={(e) => setNewTenant({ ...newTenant, admin_password: e.target.value })}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowTenantPassword(!showTenantPassword)}
+                      aria-label={showTenantPassword ? 'Hide password' : 'Show password'}
+                      style={{
+                        position: 'absolute',
+                        right: 12,
+                        background: 'none',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 4,
+                        borderRadius: 4
+                      }}
+                    >
+                      {showTenantPassword ? (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                          <line x1="1" y1="1" x2="23" y2="23" />
+                        </svg>
+                      ) : (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Organizer WhatsApp / Contact Phone</label>
+                  <input
+                    type="tel"
+                    className="form-control"
+                    placeholder="e.g. +919918327131"
+                    value={newTenant.contact_phone}
+                    onChange={(e) => setNewTenant({ ...newTenant, contact_phone: e.target.value })}
+                  />
+                  <small style={{ color: 'var(--text-dim)', fontSize: '0.72rem', marginTop: 3 }}>
+                    Receives real-time WhatsApp booking alerts when customers place ticket orders.
+                  </small>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Organizer Merchant UPI ID / VPA (Optional)</label>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="acc_cf_split_123 or rzp_linked_acc"
+                    placeholder="e.g. srproduction@upi or BHARATPE.8J0S0Z9W9S44900@FBPE"
                     value={newTenant.gateway_account_id}
                     onChange={(e) => setNewTenant({ ...newTenant, gateway_account_id: e.target.value })}
                   />
+                  <small style={{ color: 'var(--text-dim)', fontSize: '0.72rem', marginTop: 3 }}>
+                    Direct UPI MID for customer payments. Leave empty to use system default UPI ID.
+                  </small>
                 </div>
+
+                <div className="form-group">
+                  <label className="form-label">Super Admin Platform Fee per Ticket (in Paise)</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={newTenant.default_platform_fee}
+                    onChange={(e) => setNewTenant({ ...newTenant, default_platform_fee: parseInt(e.target.value, 10) || 0 })}
+                  />
+                  <small style={{ color: 'var(--text-dim)', fontSize: '0.72rem', marginTop: 3 }}>
+                    200 paise = ₹2.00 fixed deduction per ticket.
+                  </small>
+                </div>
+
                 <div className="form-group">
                   <label className="form-label">Fee Bearer Rule</label>
                   <select
@@ -746,20 +845,10 @@ export default function SuperAdminDashboard() {
                     <option value="ORGANIZER">Organizer (Absorb Fee in Payout)</option>
                   </select>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Organizer Admin Password</label>
-                  <input
-                    type="password"
-                    className="form-control"
-                    value={newTenant.admin_password}
-                    onChange={(e) => setNewTenant({ ...newTenant, admin_password: e.target.value })}
-                    required
-                  />
-                </div>
               </div>
-              <div className="modal-footer">
+              <div className="modal-footer" style={{ flexShrink: 0 }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Create Tenant</button>
+                <button type="submit" className="btn btn-primary">Create Tenant &amp; Account</button>
               </div>
             </form>
           </div>

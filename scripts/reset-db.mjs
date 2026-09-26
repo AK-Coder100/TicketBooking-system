@@ -56,7 +56,7 @@ async function resetDb() {
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         tenant_id TEXT REFERENCES tenants(id) ON DELETE SET NULL,
-        role TEXT CHECK(role IN ('SUPER_ADMIN', 'TENANT_ADMIN', 'SCANNER', 'CUSTOMER')) NOT NULL,
+        role TEXT CHECK(role IN ('SUPER_ADMIN', 'TENANT_ADMIN', 'ORGANIZER', 'SCANNER', 'CUSTOMER')) NOT NULL,
         tenant_role TEXT CHECK(tenant_role IN ('OWNER', 'EVENT_MANAGER', 'STAFF')) DEFAULT 'OWNER',
         can_create_events INTEGER DEFAULT 1,
         name TEXT NOT NULL,
@@ -136,10 +136,14 @@ async function resetDb() {
         platform_fee INTEGER NOT NULL,
         convenience_fee INTEGER NOT NULL,
         total_charged INTEGER NOT NULL,
-        payment_status TEXT CHECK(payment_status IN ('PENDING', 'PAID', 'FAILED')) DEFAULT 'PENDING',
+        payment_status TEXT CHECK(payment_status IN ('PENDING', 'PAID', 'FAILED', 'DECLINED')) DEFAULT 'PENDING',
         gateway_order_id TEXT,
         gateway_payment_id TEXT,
+        payment_reference TEXT,
         gateway_type TEXT CHECK(gateway_type IN ('UPI', 'RAZORPAY', 'CASHFREE')) DEFAULT 'UPI',
+        attendees_data TEXT,
+        tier_id TEXT,
+        event_title TEXT,
         created_at TEXT NOT NULL
       );
 

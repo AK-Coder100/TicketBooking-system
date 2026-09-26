@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
+import QRCode from 'qrcode';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface TierDraft {
@@ -80,6 +81,18 @@ function OrganizerDashboardInner() {
 
   // Organization / Tenant state
   const [selectedTenantId, setSelectedTenantId] = useState<string>('');
+  const [tenantSlug, setTenantSlug] = useState<string>('');
+
+  // QR Code Modal & Downloader state
+  const [qrModalData, setQrModalData] = useState<{
+    isOpen: boolean;
+    title: string;
+    subtitle?: string;
+    url: string;
+    qrDataUrl?: string;
+  } | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [downloadingQr, setDownloadingQr] = useState(false);
 
   // Team & Profile Permission state
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -93,6 +106,7 @@ function OrganizerDashboardInner() {
     tenant_role: 'EVENT_MANAGER',
     can_create_events: true
   });
+  const [showTeamPassword, setShowTeamPassword] = useState(false);
 
   // Scanner state
   const [manualToken, setManualToken] = useState('');
@@ -200,6 +214,9 @@ function OrganizerDashboardInner() {
       const json = await res.json();
       if (json.success && json.user) {
         setUserProfile(json.user);
+        if (json.user.tenant?.slug) {
+          setTenantSlug(json.user.tenant.slug);
+        }
         const tId = json.user.tenantId || (json.user.allTenants && json.user.allTenants[0]?.id) || '';
         if (tId) {
           setSelectedTenantId(tId);
@@ -325,11 +342,198 @@ function OrganizerDashboardInner() {
       if (json.success) {
         const evList = json.events || [];
         setEvents(evList);
+        if (json.tenantSlug) setTenantSlug(json.tenantSlug);
+        else if (evList[0]?.tenant_slug) setTenantSlug(evList[0].tenant_slug);
+
         if (evList.length > 0) {
           setSelectedEventId(prev => prev && evList.some((e: any) => e.id === prev) ? prev : evList[0].id);
         }
       }
     } catch (e) { console.error(e); }
+  };
+
+  // ── High Quality QR Code Generator & Downloader ──────────────────────────────
+  const openQrModal = async (targetUrl: string, title: string, subtitle?: string) => {
+    try {
+      const fullUrl = targetUrl.startsWith('http')
+        ? targetUrl
+        : `${typeof window !== 'undefined' ? window.location.origin : ''}${targetUrl.startsWith('/') ? '' : '/'}${targetUrl}`;
+
+      const qrDataUrl = await QRCode.toDataURL(fullUrl, {
+        width: 800,
+        margin: 2,
+        errorCorrectionLevel: 'H',
+        color: {
+          dark: '#0f172a',
+          light: '#ffffff'
+        }
+      });
+
+      setQrModalData({
+        isOpen: true,
+        title,
+        subtitle: subtitle || 'Scan to book tickets instantly via direct UPI',
+        url: fullUrl,
+        qrDataUrl
+      });
+      setCopiedLink(false);
+    } catch (err: any) {
+      console.error('Error generating QR preview:', err);
+      alert('Failed to generate QR code: ' + err.message);
+    }
+  };
+
+  const downloadHighQualityQrPng = async (targetUrl: string, title: string, subtitle?: string) => {
+    try {
+      const fullUrl = targetUrl.startsWith('http')
+        ? targetUrl
+        : `${typeof window !== 'undefined' ? window.location.origin : ''}${targetUrl.startsWith('/') ? '' : '/'}${targetUrl}`;
+
+      // 1. Generate base high-resolution QR data URL (1024x1024 with High error correction level H)
+      const qrDataUrl = await QRCode.toDataURL(fullUrl, {
+        width: 1024,
+        margin: 1,
+        errorCorrectionLevel: 'H',
+        color: {
+          dark: '#0f172a',
+          light: '#ffffff'
+        }
+      });
+
+      // 2. Create offscreen canvas for a beautiful print-ready standee poster
+      const canvas = document.createElement('canvas');
+      const width = 1200;
+      const height = 1500;
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas 2D context not available');
+
+      // Background gradient
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+      bgGrad.addColorStop(0, '#090d16');
+      bgGrad.addColorStop(1, '#0f172a');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Card Container (White)
+      const cardMargin = 60;
+      const cardWidth = width - cardMargin * 2;
+      const cardHeight = height - cardMargin * 2;
+      const cardRadius = 32;
+
+      ctx.save();
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+      ctx.shadowBlur = 40;
+      ctx.shadowOffsetY = 20;
+
+      // Rounded rectangle for card
+      ctx.beginPath();
+      ctx.roundRect(cardMargin, cardMargin, cardWidth, cardHeight, cardRadius);
+      ctx.fill();
+      ctx.restore();
+
+      // Top Header Accent Bar
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(cardMargin, cardMargin, cardWidth, 24, [cardRadius, cardRadius, 0, 0]);
+      const barGrad = ctx.createLinearGradient(cardMargin, 0, cardMargin + cardWidth, 0);
+      barGrad.addColorStop(0, '#6366f1');
+      barGrad.addColorStop(0.5, '#8b5cf6');
+      barGrad.addColorStop(1, '#ec4899');
+      ctx.fillStyle = barGrad;
+      ctx.fill();
+      ctx.restore();
+
+      // Top Title
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 44px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(title.slice(0, 32), width / 2, cardMargin + 100);
+
+      // Subtitle / Tagline
+      ctx.fillStyle = '#6366f1';
+      ctx.font = 'bold 26px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText('⚡ SCAN TO BOOK TICKETS INSTANTLY', width / 2, cardMargin + 145);
+
+      // Draw QR Code in center
+      const qrImg = new Image();
+      await new Promise((resolve, reject) => {
+        qrImg.onload = resolve;
+        qrImg.onerror = reject;
+        qrImg.src = qrDataUrl;
+      });
+
+      const qrSize = 820;
+      const qrX = (width - qrSize) / 2;
+      const qrY = cardMargin + 180;
+      ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+
+      // Bottom URL Box
+      const urlBoxY = qrY + qrSize + 20;
+      ctx.fillStyle = '#f1f5f9';
+      ctx.beginPath();
+      ctx.roundRect(cardMargin + 40, urlBoxY, cardWidth - 80, 75, 16);
+      ctx.fill();
+
+      // URL Text inside box
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 26px monospace';
+      ctx.textAlign = 'center';
+      const displayUrl = fullUrl.replace(/^https?:\/\//, '');
+      ctx.fillText(displayUrl, width / 2, urlBoxY + 48);
+
+      // Footer Notes
+      ctx.fillStyle = '#64748b';
+      ctx.font = '600 20px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText('Direct UPI Payment • Fast Entry Gate Verification', width / 2, cardMargin + cardHeight - 35);
+
+      // Convert to blob and download
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        const safeTitle = title.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 30);
+        a.download = `${safeTitle || 'event'}-booking-qr-hq.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      }, 'image/png');
+    } catch (err: any) {
+      console.error('Error generating HQ QR:', err);
+      alert('Failed to generate high-resolution QR: ' + err.message);
+    }
+  };
+
+  const downloadPureQrPng = async (targetUrl: string, title: string) => {
+    try {
+      const fullUrl = targetUrl.startsWith('http')
+        ? targetUrl
+        : `${typeof window !== 'undefined' ? window.location.origin : ''}${targetUrl.startsWith('/') ? '' : '/'}${targetUrl}`;
+
+      const qrDataUrl = await QRCode.toDataURL(fullUrl, {
+        width: 1024,
+        margin: 2,
+        errorCorrectionLevel: 'H',
+        color: {
+          dark: '#0f172a',
+          light: '#ffffff'
+        }
+      });
+      const a = document.createElement('a');
+      a.href = qrDataUrl;
+      const safeTitle = title.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 30);
+      a.download = `${safeTitle || 'event'}-qr-code-1024px.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err: any) {
+      console.error('Error downloading pure QR:', err);
+      alert('Failed to download QR: ' + err.message);
+    }
   };
 
   const loadAnalytics = async (tId?: string) => {
@@ -1439,6 +1643,101 @@ function OrganizerDashboardInner() {
               )}
             </div>
 
+            {/* Box Office Standee & QR Action Banner */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%)',
+              border: '1px solid rgba(99, 102, 241, 0.35)',
+              borderRadius: 16,
+              padding: '16px 20px',
+              marginBottom: 20,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 14
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 260 }}>
+                <div style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.4rem',
+                  flexShrink: 0
+                }}>
+                  📱
+                </div>
+                <div>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff' }}>
+                    Organization Public Box Office QR
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 2 }}>
+                    Public URL:{' '}
+                    <a
+                      href={typeof window !== 'undefined' ? `${window.location.origin}/${tenantSlug || userProfile?.tenant?.slug || 'dandiya-26'}` : `/${tenantSlug || 'dandiya-26'}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: 700 }}
+                    >
+                      {typeof window !== 'undefined' ? `${window.location.host}/${tenantSlug || userProfile?.tenant?.slug || 'dandiya-26'}` : `/${tenantSlug || 'dandiya-26'}`} ↗
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentSlug = tenantSlug || userProfile?.tenant?.slug || 'dandiya-26';
+                    const targetUrl = `${window.location.origin}/${currentSlug}`;
+                    openQrModal(targetUrl, tenantName, 'Official Festival Box Office');
+                  }}
+                  style={{
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: 10,
+                    padding: '8px 16px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6
+                  }}
+                >
+                  <span>📷</span> View &amp; Download QR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentSlug = tenantSlug || userProfile?.tenant?.slug || 'dandiya-26';
+                    const targetUrl = `${window.location.origin}/${currentSlug}`;
+                    downloadHighQualityQrPng(targetUrl, tenantName, 'Official Festival Box Office');
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    color: '#e2e8f0',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: 10,
+                    padding: '8px 16px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6
+                  }}
+                >
+                  <span>⬇️</span> Quick Standee PNG
+                </button>
+              </div>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 18 }}>
               {events.map(e => (
                 <div
@@ -1474,6 +1773,35 @@ function OrganizerDashboardInner() {
                         alt={e.title}
                         style={{ height: '100%', width: '100%', objectFit: 'cover' }}
                       />
+                      <button
+                        type="button"
+                        onClick={(evt) => {
+                          evt.stopPropagation();
+                          const slugToUse = e.tenant_slug || tenantSlug || 'test-dandiya-26';
+                          const targetUrl = `${window.location.origin}/${slugToUse}`;
+                          openQrModal(targetUrl, e.title, e.location);
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: 10,
+                          left: 10,
+                          background: 'rgba(9, 13, 22, 0.85)',
+                          backdropFilter: 'blur(8px)',
+                          border: '1px solid rgba(16, 185, 129, 0.4)',
+                          borderRadius: 8,
+                          padding: '3px 8px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          color: '#34d399',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4
+                        }}
+                        title="Download Booking QR PNG"
+                      >
+                        <span>📷</span> QR PNG
+                      </button>
                       <div style={{
                         position: 'absolute',
                         top: 10,
@@ -1487,7 +1815,7 @@ function OrganizerDashboardInner() {
                         fontWeight: 700,
                         color: '#38bdf8'
                       }}>
-                        👥 View Participants →
+                        👥 View Roster →
                       </div>
                     </div>
 
@@ -1540,30 +1868,56 @@ function OrganizerDashboardInner() {
                       <span>Checked In: <b style={{ color: '#a5b4fc' }}>{e.checked_in_count || 0}</b></span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={(evt) => {
-                        evt.stopPropagation();
-                        router.push(`/organizer/${e.id}/members${selectedTenantId ? `?tenantId=${selectedTenantId}` : ''}`);
-                      }}
-                      style={{
-                        width: '100%',
-                        background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.15) 0%, rgba(99, 102, 241, 0.2) 100%)',
-                        border: '1px solid rgba(56, 189, 248, 0.35)',
-                        color: '#38bdf8',
-                        padding: '8px 14px',
-                        borderRadius: 10,
-                        fontSize: '0.82rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 6
-                      }}
-                    >
-                      👥 View Participants Roster →
-                    </button>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={(evt) => {
+                          evt.stopPropagation();
+                          const slugToUse = e.tenant_slug || tenantSlug || 'test-dandiya-26';
+                          const targetUrl = `${window.location.origin}/${slugToUse}`;
+                          openQrModal(targetUrl, e.title, e.location);
+                        }}
+                        style={{
+                          background: 'rgba(16, 185, 129, 0.15)',
+                          border: '1px solid rgba(16, 185, 129, 0.35)',
+                          color: '#34d399',
+                          padding: '8px 10px',
+                          borderRadius: 10,
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 5
+                        }}
+                      >
+                        <span>📷</span> QR PNG
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(evt) => {
+                          evt.stopPropagation();
+                          router.push(`/organizer/${e.id}/members${selectedTenantId ? `?tenantId=${selectedTenantId}` : ''}`);
+                        }}
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.15) 0%, rgba(99, 102, 241, 0.2) 100%)',
+                          border: '1px solid rgba(56, 189, 248, 0.35)',
+                          color: '#38bdf8',
+                          padding: '8px 10px',
+                          borderRadius: 10,
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 5
+                        }}
+                      >
+                        <span>👥</span> Roster →
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -2169,7 +2523,47 @@ function OrganizerDashboardInner() {
               </div>
               <div className="form-group">
                 <label className="form-label">Temporary Password</label>
-                <input type="password" className="form-control" value={newTeamMember.password} onChange={e => setNewTeamMember({ ...newTeamMember, password: e.target.value })} placeholder="••••••••" required />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type={showTeamPassword ? 'text' : 'password'}
+                    className="form-control"
+                    style={{ width: '100%', paddingRight: 42 }}
+                    value={newTeamMember.password}
+                    onChange={e => setNewTeamMember({ ...newTeamMember, password: e.target.value })}
+                    placeholder="••••••••"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowTeamPassword(!showTeamPassword)}
+                    aria-label={showTeamPassword ? 'Hide password' : 'Show password'}
+                    style={{
+                      position: 'absolute',
+                      right: 12,
+                      background: 'none',
+                      border: 'none',
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 4,
+                      borderRadius: 4
+                    }}
+                  >
+                    {showTeamPassword ? (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
               <div className="form-group">
                 <label className="form-label">Role</label>
@@ -2327,6 +2721,238 @@ function OrganizerDashboardInner() {
                 </div>
               )}
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════
+          MODAL: HIGH QUALITY QR CODE VIEWER & DOWNLOADER
+         ════════════════════════════════════════════════════════════════════ */}
+      {qrModalData && qrModalData.isOpen && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setQrModalData(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(10px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: 16
+          }}
+        >
+          <div
+            className="modal-dialog"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#0f172a',
+              border: '1px solid rgba(99, 102, 241, 0.35)',
+              borderRadius: 20,
+              maxWidth: 480,
+              width: '100%',
+              padding: 0,
+              overflow: 'hidden',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)'
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'rgba(15, 23, 42, 0.95)'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
+                  Event Booking QR Code
+                </h3>
+                <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
+                  Print-ready high resolution &amp; sharable link
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQrModalData(null)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.5rem', cursor: 'pointer', lineHeight: 1 }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+              {/* Standee Preview Card */}
+              <div style={{
+                background: '#ffffff',
+                padding: '20px 24px',
+                borderRadius: 16,
+                boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
+                maxWidth: 300,
+                width: '100%',
+                marginBottom: 18,
+                position: 'relative',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 6,
+                  background: 'linear-gradient(90deg, #6366f1, #8b5cf6, #ec4899)'
+                }} />
+                <div style={{ color: '#0f172a', fontWeight: 800, fontSize: '1rem', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {qrModalData.title}
+                </div>
+                <div style={{ color: '#6366f1', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '4px 0 10px' }}>
+                  ⚡ Scan to Book Tickets
+                </div>
+
+                {qrModalData.qrDataUrl && (
+                  <img
+                    src={qrModalData.qrDataUrl}
+                    alt="Event Booking QR"
+                    style={{ width: '100%', height: 'auto', borderRadius: 8, display: 'block' }}
+                  />
+                )}
+
+                <div style={{
+                  marginTop: 10,
+                  background: '#f1f5f9',
+                  padding: '6px 8px',
+                  borderRadius: 6,
+                  fontSize: '0.68rem',
+                  fontFamily: 'monospace',
+                  color: '#0f172a',
+                  fontWeight: 700,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {qrModalData.url.replace(/^https?:\/\//, '')}
+                </div>
+              </div>
+
+              {/* Copy URL Row */}
+              <div style={{
+                width: '100%',
+                background: 'rgba(15, 23, 42, 0.8)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: 10,
+                padding: '8px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+                marginBottom: 16
+              }}>
+                <span style={{ fontSize: '0.78rem', color: '#cbd5e1', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left', flex: 1 }}>
+                  {qrModalData.url}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(qrModalData.url);
+                    setCopiedLink(true);
+                    setTimeout(() => setCopiedLink(false), 2500);
+                  }}
+                  style={{
+                    background: copiedLink ? '#10b981' : 'rgba(99, 102, 241, 0.25)',
+                    border: `1px solid ${copiedLink ? '#10b981' : 'rgba(99, 102, 241, 0.5)'}`,
+                    color: '#ffffff',
+                    borderRadius: 6,
+                    padding: '4px 10px',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {copiedLink ? '✓ Copied!' : '📋 Copy'}
+                </button>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button
+                  type="button"
+                  disabled={downloadingQr}
+                  onClick={async () => {
+                    setDownloadingQr(true);
+                    await downloadHighQualityQrPng(qrModalData.url, qrModalData.title, qrModalData.subtitle);
+                    setDownloadingQr(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: 10,
+                    padding: '11px',
+                    fontSize: '0.88rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)'
+                  }}
+                >
+                  <span>📥</span> {downloadingQr ? 'Generating High-Res Poster...' : 'Download HQ Poster PNG (1200×1500 Print)'}
+                </button>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => downloadPureQrPng(qrModalData.url, qrModalData.title)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.07)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      color: '#e2e8f0',
+                      borderRadius: 10,
+                      padding: '9px 12px',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6
+                    }}
+                  >
+                    <span>🔳</span> Pure QR (1024px)
+                  </button>
+
+                  <a
+                    href={qrModalData.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      background: 'rgba(56, 189, 248, 0.12)',
+                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      color: '#38bdf8',
+                      borderRadius: 10,
+                      padding: '9px 12px',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6
+                    }}
+                  >
+                    <span>↗️</span> Test Live Page
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

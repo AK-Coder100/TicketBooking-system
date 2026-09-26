@@ -23,12 +23,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'No tenant context found' }, { status: 400 });
     }
 
+    const tenantRow: any = await db.prepare('SELECT id, slug, name FROM tenants WHERE id = ?').get(tenantId);
+
     const events: any[] = await db.prepare(`
       SELECT e.*,
+        t.slug as tenant_slug,
+        t.name as tenant_name,
         (SELECT COUNT(*) FROM event_sessions es WHERE es.event_id = e.id) as session_count,
         (SELECT COUNT(tk.id) FROM tickets tk JOIN orders o ON tk.order_id = o.id JOIN ticket_tiers tt ON tk.tier_id = tt.id WHERE tt.event_id = e.id AND o.payment_status = 'PAID') as tickets_sold,
         (SELECT COUNT(tk.id) FROM tickets tk JOIN ticket_tiers tt ON tk.tier_id = tt.id WHERE tt.event_id = e.id AND tk.checkin_count > 0) as checked_in_count
       FROM events e
+      LEFT JOIN tenants t ON e.tenant_id = t.id
       WHERE e.tenant_id = ?
       ORDER BY e.created_at DESC
     `).all(tenantId);
@@ -55,7 +60,13 @@ export async function GET(request: NextRequest) {
       ev.tiers = globalTiers; // legacy fallback
     }
 
-    return NextResponse.json({ success: true, events, tenantId });
+    return NextResponse.json({
+      success: true,
+      events,
+      tenantId,
+      tenantSlug: tenantRow?.slug || events[0]?.tenant_slug || '',
+      tenantName: tenantRow?.name || events[0]?.tenant_name || ''
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
