@@ -1424,7 +1424,7 @@ function OrganizerDashboardInner() {
                 <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>My Organization Events</h2>
                 <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: 3 }}>Manage public listings, sessions, and ticket pricing.</p>
               </div>
-              {/* {userProfile?.canCreateEvents !== false ? (
+              {userProfile?.canCreateEvents !== false ? (
                 <button
                   className="btn btn-primary"
                   onClick={openModal}
@@ -1436,7 +1436,7 @@ function OrganizerDashboardInner() {
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', padding: '6px 12px', borderRadius: 10, fontSize: '0.78rem', color: '#fbbf24' }}>
                   🔒 Event Creation Restricted for your Profile ({userProfile?.tenantRole || 'Staff'})
                 </div>
-              )} */}
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 18 }}>
