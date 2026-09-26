@@ -1,74 +1,6 @@
 import { db } from './db';
 import crypto from 'node:crypto';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function getSystemBaseUrl(): string {
-  if (
-    process.env.BASE_URL &&
-    !process.env.BASE_URL.includes('localhost') &&
-    !process.env.BASE_URL.includes('127.0.0.1')
-  ) {
-    return process.env.BASE_URL;
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  return process.env.BASE_URL || 'http://localhost:5000';
-}
-
-/**
- * Returns the base URL that Meta's servers can reach to download ticket images.
- * Priority: WHATSAPP_PUBLIC_BASE_URL → BASE_URL (if non-localhost) → VERCEL_URL → localhost fallback
- * Set WHATSAPP_PUBLIC_BASE_URL=https://event.neoclare.com in .env on the production server.
- * On localhost it will fall back to the direct media-upload path instead.
- */
-function getWhatsAppBaseUrl(): string {
-  return getSystemBaseUrl();
-}
-
-function isLocalhostUrl(url: string): boolean {
-  return url.includes('localhost') || url.includes('127.0.0.1');
-}
-
-/**
- * Upload a PNG buffer directly to Meta's WhatsApp Media API.
- * Returns the media_id string on success, or null on failure.
- * This is required when BASE_URL is localhost and Meta cannot download the file.
- */
-async function uploadTicketImageToMeta(
-  pngBuffer: Buffer,
-  phoneNumberId: string,
-  accessToken: string
-): Promise<string | null> {
-  try {
-    const formData = new FormData();
-    const blob = new Blob([new Uint8Array(pngBuffer)], { type: 'image/png' });
-    formData.append('file', blob, 'ticket.png');
-    formData.append('type', 'image/png');
-    formData.append('messaging_product', 'whatsapp');
-
-    const res = await fetch(`https://graph.facebook.com/v22.0/${phoneNumberId}/media`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}` },
-      body: formData
-    });
-
-    const json = await res.json();
-    if (res.ok && json.id) {
-      console.log('[WhatsApp] Media uploaded successfully, media_id:', json.id);
-      return json.id as string;
-    }
-    console.warn('[WhatsApp] Media upload failed:', json);
-    return null;
-  } catch (err) {
-    console.error('[WhatsApp] Media upload exception:', err);
-    return null;
-  }
-}
-
 function normalizePhoneForService(rawPhone: string): string {
   let cleaned = (rawPhone || '').replace(/[^0-9]/g, '');
   if (cleaned.length === 10) {
@@ -116,14 +48,12 @@ export async function sendWhatsAppTicketMessage({
     throw new Error('Recipient phone number is missing or invalid');
   }
 
-  const baseUrl      = getWhatsAppBaseUrl();
-  const pngTicketUrl = `${baseUrl}/api/client/tickets/${ticketId}/png`;
-  const messageId    = `wamid_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-  const now          = new Date().toISOString();
+  const messageId = `wamid_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+  const now = new Date().toISOString();
 
   // ── Build body parameter values from event data ───────────────────────────
   const startDate = ticket.start_date ? new Date(ticket.start_date) : null;
-  const endDate   = ticket.end_date   ? new Date(ticket.end_date)   : null;
+  const endDate = ticket.end_date ? new Date(ticket.end_date) : null;
 
   // Format Date (e.g. "15 TO 19 OCT 2026" or "15 OCT 2026")
   let dateParam = 'TBA';
@@ -164,7 +94,7 @@ export async function sendWhatsAppTicketMessage({
   const ticketServiceUrl = `${process.env.WHATSAPP_SERVICE_BASE_URL || 'http://localhost:8000'}/api/send-ticket`;
 
   const disclaimerCaption =
-`🎟️ Ticket Booking Confirmed!\n\nYour ticket has been successfully booked.\n⚠️ Disclaimer: The event is solely organized and managed by the Event Organizer. In case of cancellation, postponement, rescheduling, venue change, refund, or any other event-related issue, the Organizer shall be solely responsible. Our website/platform acts only as a ticketing/booking platform and shall not be held responsible or liable for such matters.\n\nThank you.`;
+    `🎟️ Ticket Booking Confirmed!\n\nYour ticket has been successfully booked.\n⚠️ ⚠️ Disclaimer: The event is solely managed by the Organizer. Any cancellation, postponement, rescheduling, venue change, refund, or other event-related matters are the Organizer’s responsibility. Our platform only facilitates ticket booking and is not liable for such matters.\n\nThank you.`;
 
   const ticketPayload = {
     phone: recipientPhone,
@@ -218,7 +148,6 @@ export async function sendWhatsAppTicketMessage({
       recipientPhone,
       recipientName: ticket.customer_name,
       dispatchStatus,
-      pngTicketUrl,
       ticketPayload,
       error: errorDetail
     }),
@@ -229,7 +158,6 @@ export async function sendWhatsAppTicketMessage({
     success: dispatchStatus !== 'FAILED',
     messageId,
     dispatchStatus,
-    pngTicketUrl,
     error: errorDetail
   };
 }
@@ -264,10 +192,10 @@ export async function sendWhatsAppTextMessage({
 
     if (!res.ok) {
       console.warn(`[WhatsApp Service Warning]: HTTP ${res.status}`, json);
-      return { 
-        success: false, 
-        status: res.status, 
-        detail: json?.detail || json?.message || 'Failed to send WhatsApp message' 
+      return {
+        success: false,
+        status: res.status,
+        detail: json?.detail || json?.message || 'Failed to send WhatsApp message'
       };
     }
 
@@ -298,8 +226,8 @@ export async function sendWhatsAppOrderProcessedMessage({
   const utrLine = utr ? `\n• *UPI Ref / UTR:* ${utr}` : '';
   const amountLine = amount ? `\n• *Amount:* ₹${amount}` : '';
 
-  const messageText = 
-`🎟️ *Transaction In Process!*
+  const messageText =
+    `🎟️ *Transaction In Process!*
 
 Hi ${name}, we are processing your transaction for *${event}*!
 
@@ -310,7 +238,19 @@ Our team is verifying your payment with the bank. Once confirmed, your ticket pa
 
 Thank you!`;
 
-  return sendWhatsAppTextMessage({ toPhone, messageText });
+  const res = await sendWhatsAppTextMessage({ toPhone, messageText });
+  if (res.success) {
+    const organizerPhone = process.env.ORGANIZER_PHONE || process.env.ORGANIZER_WHATSAPP_PHONE || process.env.ADMIN_PHONE;
+    if (organizerPhone) {
+      const notificationmsg = `🤑 *New Order Request*
+• *Order ID:* ${orderId}
+• *Event:* ${event}
+• *Customer:* ${name} (${toPhone})
+• *Amount:* ₹${amount}`;
+      return sendWhatsAppTextMessage({ toPhone: organizerPhone, messageText: notificationmsg });
+    }
+  }
+  return res;
 }
 
 export async function sendWhatsAppOrderDeclinedMessage({
@@ -327,8 +267,8 @@ export async function sendWhatsAppOrderDeclinedMessage({
   const name = customerName || 'Valued Attendee';
   const event = eventTitle || 'Your Event';
 
-  const messageText = 
-`⚠️ *Ticket Request Update*
+  const messageText =
+    `⚠️ *Ticket Request Update*
 
 Hi ${name}, we could not verify the payment for your booking request:
 

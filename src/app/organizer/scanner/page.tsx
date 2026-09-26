@@ -746,8 +746,8 @@ function ScannerContent() {
                 background: isGreen
                   ? 'rgba(16, 185, 129, 0.12)'
                   : isYellow
-                  ? 'rgba(245, 158, 11, 0.12)'
-                  : 'rgba(244, 63, 94, 0.12)',
+                    ? 'rgba(245, 158, 11, 0.12)'
+                    : 'rgba(244, 63, 94, 0.12)',
                 border: `1.5px solid ${isGreen ? '#10b981' : isYellow ? '#f59e0b' : '#f43f5e'}`,
                 display: 'flex',
                 flexDirection: 'column',
@@ -879,7 +879,7 @@ function ScannerContent() {
             )}
 
             {/* ── Detected QR Value (if not displaying result) ── */}
-            {lastQr && !result && !processing && (
+            {/* {lastQr && !result && !processing && (
               <div style={{
                 padding: '8px 12px',
                 background: 'rgba(15, 23, 42, 0.8)',
@@ -893,7 +893,7 @@ function ScannerContent() {
                 <span style={{ color: '#818cf8', fontWeight: 700 }}>Detected: </span>
                 {lastQr}
               </div>
-            )}
+            )} */}
 
             {/* ── Manual Input Entry ── */}
             <form
