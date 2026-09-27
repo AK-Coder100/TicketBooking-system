@@ -44,7 +44,7 @@ export async function GET(
       headers['Content-Disposition'] = `attachment; filename="${tenant.slug}-booking-qr.png"`;
     }
 
-    return new Response(pngBuffer, {
+    return new Response(new Uint8Array(pngBuffer), {
       status: 200,
       headers
     });
