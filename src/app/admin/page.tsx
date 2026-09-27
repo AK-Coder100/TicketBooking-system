@@ -665,14 +665,14 @@ export default function SuperAdminDashboard() {
 
           {activeTab === 'payments' && (
             <div>
-              <h2 style={{ fontSize: '1.6rem', marginBottom: 6 }}>⚡ Direct UPI &amp; Platform Commission Settings</h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 24 }}>All payments run via Direct UPI (Zero gateway fees / instant settlement via UpiService).</p>
+              <h2 style={{ fontSize: '1.6rem', marginBottom: 6 }}>💳 Paytm Payment Gateway &amp; Platform Commission Settings</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 24 }}>All transactions are processed through Paytm Payment Gateway (Cards, Net Banking, UPI, Paytm Wallet).</p>
 
               <div className="glass-panel" style={{ padding: 28, maxWidth: 640 }}>
                 <div className="form-group">
                   <label className="form-label">Active Payment Mode</label>
-                  <div style={{ padding: '10px 14px', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: 8, color: '#34d399', fontWeight: 700, fontSize: '0.9rem' }}>
-                    ⚡ Direct UPI (UPI Intent Deeplinking &amp; Dynamic QR Code)
+                  <div style={{ padding: '10px 14px', background: 'rgba(0, 185, 245, 0.12)', border: '1px solid rgba(0, 185, 245, 0.3)', borderRadius: 8, color: '#00b9f5', fontWeight: 700, fontSize: '0.9rem' }}>
+                    💳 Paytm Payment Gateway (Merchant ID: MUHgMY57617969874640)
                   </div>
                 </div>
 

@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     const platformSettings: Record<string, string> = {};
     for (const r of settingRows) platformSettings[r.key] = r.value;
 
-    const activeGateway = 'UPI';
+    const activeGateway = 'PAYTM';
     const breakdown = computeSplitRules({
       basePricePaise,
       ticketCount: count,
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
       `).run(generalUserId, finalCustomerName, placeholderEmail, customerPhone, now);
     }
 
-    // Insert pending order with persisted attendee records for later admin approval
+    // Insert pending order with persisted attendee records
     await db.prepare(`
       INSERT INTO orders (id, tenant_id, user_id, customer_name, customer_phone, customer_email,
                           total_base_price, platform_fee, convenience_fee, total_charged,
@@ -144,14 +144,18 @@ export async function POST(request: NextRequest) {
       now
     );
 
-    // Create UPI payment session order
+    // Create Paytm Payment Gateway session order
     const adapter = PaymentService.getAdapter(activeGateway);
     let gatewayOrder: any;
     try {
+      const isMobile = request.headers.get('user-agent')?.toLowerCase().includes('mobile') || false;
+      const origin = request.headers.get('origin') || request.headers.get('host') ? `http://${request.headers.get('host')}` : (process.env.BASE_URL || 'http://localhost:5000');
+      const callbackUrl = `${origin}/api/client/paytm/callback`;
+
       gatewayOrder = await adapter.createOrder({
         amountPaise: breakdown.totalChargedPaise,
         currency: 'INR',
-        customer: { name: customerName, phone: customerPhone, email: customerEmail },
+        customer: { name: finalCustomerName, phone: customerPhone, email: customerEmail },
         splitDetails: {
           tenantGatewayAccountId: primaryTier.gateway_account_id,
           platformFeePaise: breakdown.platformFeePaise,
@@ -159,10 +163,12 @@ export async function POST(request: NextRequest) {
         },
         orderId,
         eventTitle: primaryTier.event_title,
-        tenantUpiId: primaryTier.gateway_account_id,
-        tenantName: primaryTier.tenant_name
+        tenantName: primaryTier.tenant_name,
+        isMobile,
+        callbackUrl
       });
     } catch (orderErr: any) {
+      console.error('Paytm order creation error:', orderErr);
       await db.prepare(`UPDATE orders SET payment_status = 'FAILED' WHERE id = ?`).run(orderId);
       return NextResponse.json({ success: false, error: orderErr.message }, { status: 400 });
     }
@@ -174,9 +180,10 @@ export async function POST(request: NextRequest) {
       success: true,
       orderId,
       gatewayOrder,
-      upiSession: gatewayOrder.upiSession,
+      paytmParams: gatewayOrder.paytmParams,
+      processTxnUrl: gatewayOrder.processTxnUrl,
       breakdown,
-      // echo back so verify-payment can reuse
+      tenantSlug: primaryTier.tenant_slug || undefined,
       resolvedAttendees: attendeeList
     });
   } catch (err: any) {

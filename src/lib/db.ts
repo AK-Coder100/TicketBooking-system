@@ -213,9 +213,10 @@ export async function initSchema(): Promise<void> {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
 
-      -- Ensure orders_gateway_type_check and payment_status constraints permit UPI and DECLINED
+      -- Ensure orders_gateway_type_check and payment_status constraints permit PAYTM
       ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_gateway_type_check;
-      ALTER TABLE orders ADD CONSTRAINT orders_gateway_type_check CHECK (gateway_type IN ('UPI', 'RAZORPAY', 'CASHFREE'));
+      ALTER TABLE orders ADD CONSTRAINT orders_gateway_type_check CHECK (gateway_type IN ('PAYTM', 'UPI', 'RAZORPAY', 'CASHFREE'));
+      ALTER TABLE orders ALTER COLUMN gateway_type SET DEFAULT 'PAYTM';
       ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_payment_status_check;
       ALTER TABLE orders ADD CONSTRAINT orders_payment_status_check CHECK (payment_status IN ('PENDING', 'PAID', 'FAILED', 'DECLINED'));
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS attendees_data TEXT;

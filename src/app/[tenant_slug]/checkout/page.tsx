@@ -102,6 +102,36 @@ export default function TenantCheckoutPage() {
       });
   }, [tenantSlug, preselectedEventId]);
 
+  // Listen for Paytm Gateway Redirect Callback params
+  useEffect(() => {
+    const orderIdParam = searchParams.get('orderId');
+    const paymentStatus = searchParams.get('paymentStatus');
+    const errorParam = searchParams.get('error');
+
+    if (errorParam) {
+      setErrorMsg(`Payment: ${decodeURIComponent(errorParam)}`);
+    }
+
+    if (orderIdParam) {
+      fetch(`/api/client/orders/${orderIdParam}`)
+        .then(res => res.json())
+        .then(async data => {
+          if (data.success && data.order) {
+            setConfirmedOrder(data.order);
+            setConfirmedTickets(data.tickets || []);
+            const qrs: Record<string, string> = {};
+            for (const t of (data.tickets || [])) {
+              const qr = await QRCode.toDataURL(t.qr_secret_token, { width: 240, margin: 1 });
+              qrs[t.id] = qr;
+            }
+            setQrCodeMap(qrs);
+            setStep('status');
+          }
+        })
+        .catch(err => console.warn('Order status fetch error:', err));
+    }
+  }, [searchParams]);
+
   // Countdown timer effect
   useEffect(() => {
     if (secondsRemaining === null || secondsRemaining <= 0) return;
@@ -268,7 +298,26 @@ export default function TenantCheckoutPage() {
     }
   };
 
-  // Step 2 -> Launch Payment
+  // Dynamically submit payment form to Paytm Payment Gateway
+  const submitToPaytm = (processTxnUrl: string, paytmParams: Record<string, any>) => {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = processTxnUrl;
+    form.style.display = 'none';
+
+    Object.entries(paytmParams).forEach(([key, val]) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = key;
+      input.value = String(val);
+      form.appendChild(input);
+    });
+
+    document.body.appendChild(form);
+    form.submit();
+  };
+
+  // Step 2 -> Launch Paytm Payment
   const handleProceedToPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -303,105 +352,16 @@ export default function TenantCheckoutPage() {
       if (!res.ok || !data.success) throw new Error(data.error || 'Checkout failed');
 
       setPendingOrder(data);
-      setUpiPaymentTab('upi');
-      let wasInitiated = false;
-      try {
-        if (typeof window !== 'undefined' && localStorage.getItem('payment_initiated_' + data.orderId) === 'true') {
-          wasInitiated = true;
-        }
-      } catch (e) { }
-      setHasInitiatedPayment(wasInitiated);
+
+      if (data.processTxnUrl && data.paytmParams) {
+        submitToPaytm(data.processTxnUrl, data.paytmParams);
+        return;
+      }
+
       setShowPaymentModal(true);
     } catch (err: any) {
       setErrorMsg(err.message || 'Payment initiation error');
-    } finally {
       setLoading(false);
-    }
-  };
-
-  // Finalize payment and generate tickets
-  const finalizePayment = async (orderId: string, paymentId?: string, utr?: string) => {
-    setLoading(true);
-    setErrorMsg(null);
-    try {
-      const primaryTierId = attendees[0]?.tierId || sortedFilteredTiers[0]?.id;
-
-      const res = await fetch('/api/client/verify-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId,
-          tierId: primaryTierId,
-          paymentId: paymentId || (utr ? `utr_${utr}` : `upi_pay_${Date.now()}`),
-          utr: utr || undefined,
-          sessionToken,
-          attendees: attendees.map(a => ({
-            name: a.name.trim(),
-            age: parseInt(a.age, 10) || 18,
-            tierId: a.tierId
-          }))
-        })
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || 'Payment verification failed');
-
-      setShowPaymentModal(false);
-      setSecondsRemaining(null);
-
-      const orderRes = await fetch(`/api/client/orders/${data.orderId}`);
-      const orderData = await orderRes.json();
-      if (orderData.success) {
-        setConfirmedOrder(orderData.order);
-        setConfirmedTickets(orderData.tickets || []);
-
-        const qrs: Record<string, string> = {};
-        for (const t of (orderData.tickets || [])) {
-          const qr = await QRCode.toDataURL(t.qr_secret_token, { width: 240, margin: 1 });
-          qrs[t.id] = qr;
-        }
-        setQrCodeMap(qrs);
-        setStep('status');
-      }
-    } catch (err: any) {
-      setErrorMsg('Payment error: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyUpiPayment = async () => {
-    if (!pendingOrder) return;
-    await finalizePayment(
-      pendingOrder.orderId,
-      `upi_${pendingOrder.orderId}`
-    );
-  };
-
-  const handleLaunchUpi = async (targetUrl?: string) => {
-    if (!pendingOrder) return;
-    setHasInitiatedPayment(true);
-    try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('payment_initiated_' + pendingOrder.orderId, 'true');
-      }
-    } catch (e) { }
-
-    if (targetUrl) {
-      window.location.href = targetUrl;
-    }
-
-    // Automatically confirm and finalize payment upon clicking Pay
-    await finalizePayment(
-      pendingOrder.orderId,
-      `upi_${pendingOrder.orderId}`
-    );
-  };
-
-  const handleCopyUpiId = (upiId: string) => {
-    if (navigator?.clipboard) {
-      navigator.clipboard.writeText(upiId);
-      setCopiedUpi(true);
-      setTimeout(() => setCopiedUpi(false), 2500);
     }
   };
 
@@ -724,236 +684,97 @@ export default function TenantCheckoutPage() {
             <button
               type="submit"
               className="btn btn-primary"
-              style={{ width: '100%', padding: '12px 16px', fontSize: '0.95rem', fontWeight: 700 }}
+              style={{
+                width: '100%',
+                padding: '14px 16px',
+                fontSize: '1rem',
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10,
+                background: 'linear-gradient(135deg, #002970 0%, #00b9f5 100%)',
+                border: 'none',
+                boxShadow: '0 4px 18px rgba(0, 185, 245, 0.4)'
+              }}
               disabled={loading}
             >
-              {loading ? 'Generating UPI Session...' : `Pay via UPI (₹${breakdown ? (breakdown.totalChargedPaise / 100).toFixed(2) : ''})`}
+              <span>🔒</span>
+              <span>{loading ? 'Connecting to Paytm Gateway...' : `Pay via Paytm PG (₹${breakdown ? (breakdown.totalChargedPaise / 100).toFixed(2) : ''})`}</span>
             </button>
           </form>
         </div>
       )}
 
-      {/* UPI PAYMENT MODAL */}
-      {showPaymentModal && pendingOrder && (() => {
-        const upiData = pendingOrder.upiSession || pendingOrder.gatewayOrder?.upiSession || pendingOrder.gatewayOrder || {};
-        const upiId = upiData.merchantUpiId;
-        const trValue = pendingOrder.orderId;
-        const tnValue = upiData.note || ('Booking ' + pendingOrder.orderId + (selectedEvent?.title ? ' - ' + selectedEvent.title : ''));
-        const upiLink = upiData.upiLink || `upi://pay?pa=${encodeURIComponent(upiId)}&pn=Tickets&tr=${encodeURIComponent(trValue)}&tn=${encodeURIComponent(tnValue)}&am=${(pendingOrder.breakdown.totalChargedPaise / 100).toFixed(2)}&cu=INR&mode=02`;
-        const appLinks = upiData.appLinks || {};
-
-        return (
-          <div className="modal-backdrop">
-            <div className="modal-dialog" style={{ maxWidth: 440, borderRadius: 16, background: '#0f172a', border: '1px solid rgba(255, 255, 255, 0.15)', boxShadow: '0 20px 50px rgba(0,0,0,0.6)' }}>
-              <div className="modal-header" style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: '1.2rem' }}>⚡</span>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#f8fafc' }}>Direct UPI Payment</h3>
-                    <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Zero Gateway Fees • Instant Ticket Delivery</div>
-                  </div>
+      {/* PAYTM PAYMENT GATEWAY MODAL */}
+      {showPaymentModal && pendingOrder && (
+        <div className="modal-backdrop">
+          <div className="modal-dialog" style={{ maxWidth: 440, borderRadius: 16, background: '#0f172a', border: '1px solid rgba(255, 255, 255, 0.15)', boxShadow: '0 20px 50px rgba(0,0,0,0.6)' }}>
+            <div className="modal-header" style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ background: '#002970', color: '#00b9f5', padding: '3px 8px', borderRadius: 6, fontWeight: 900, fontSize: '0.85rem' }}>Paytm</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#f8fafc' }}>Paytm Payment Gateway</h3>
+                  <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Cards • Net Banking • UPI • Paytm Wallet</div>
                 </div>
+              </div>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.4rem', cursor: 'pointer', padding: 0 }}
+                aria-label="Close"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="modal-body" style={{ padding: '20px', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4 }}>Amount to Pay</div>
+              <div style={{ fontSize: '1.9rem', fontWeight: 900, color: '#34d399', marginBottom: 12 }}>
+                ₹{(pendingOrder.breakdown?.totalChargedPaise / 100).toFixed(2)}
+              </div>
+
+              <p style={{ color: '#94a3b8', fontSize: '0.82rem', marginBottom: 20 }}>
+                You are being redirected to Paytm's 256-bit SSL encrypted payment gateway.
+              </p>
+
+              {pendingOrder.processTxnUrl && pendingOrder.paytmParams && (
                 <button
-                  onClick={() => setShowPaymentModal(false)}
-                  style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.4rem', cursor: 'pointer', padding: 0 }}
-                  aria-label="Close"
+                  type="button"
+                  onClick={() => submitToPaytm(pendingOrder.processTxnUrl, pendingOrder.paytmParams)}
+                  style={{
+                    width: '100%',
+                    padding: '14px 16px',
+                    borderRadius: 10,
+                    background: 'linear-gradient(135deg, #002970 0%, #00b9f5 100%)',
+                    color: '#ffffff',
+                    fontSize: '1rem',
+                    fontWeight: 800,
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 16px rgba(0, 185, 245, 0.4)'
+                  }}
                 >
-                  &times;
+                  Proceed to Paytm Gateway &rarr;
                 </button>
-              </div>
+              )}
 
-              <div className="modal-body" style={{ padding: '18px 20px', maxHeight: '82vh', overflowY: 'auto' }}>
-                {/* Hold Timer Alert */}
-                {secondsRemaining !== null && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    padding: '6px 12px',
-                    borderRadius: 8,
-                    background: secondsRemaining < 120 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-                    border: secondsRemaining < 120 ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)',
-                    color: secondsRemaining < 120 ? '#fca5a5' : '#93c5fd',
-                    fontSize: '0.78rem',
-                    fontWeight: 600,
-                    marginBottom: 14
-                  }}>
-                    <span>⏱️</span>
-                    <span>Hold Reserved: <b>{formatTimer(secondsRemaining)}</b></span>
-                  </div>
-                )}
-
-                {/* Amount Display */}
-                <div style={{ textAlign: 'center', marginBottom: 12, background: 'rgba(255, 255, 255, 0.03)', padding: '10px 14px', borderRadius: 12, border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Amount to Pay</div>
-                  <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#34d399', margin: '2px 0' }}>
-                    ₹{(pendingOrder.breakdown.totalChargedPaise / 100).toFixed(2)}
-                  </div>
-                </div>
-
-                {/* Segmented Payment Tabs: UPI vs QR Code */}
+              {errorMsg && (
                 <div style={{
-                  display: 'flex',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  padding: 4,
-                  borderRadius: 12,
-                  marginBottom: 16,
-                  border: '1px solid rgba(255, 255, 255, 0.08)'
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#fca5a5',
+                  fontSize: '0.78rem',
+                  marginTop: 14
                 }}>
-                  <button
-                    type="button"
-                    onClick={() => setUpiPaymentTab('upi')}
-                    style={{
-                      flex: 1,
-                      padding: '9px 12px',
-                      borderRadius: 8,
-                      border: 'none',
-                      background: upiPaymentTab === 'upi' ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : 'transparent',
-                      color: upiPaymentTab === 'upi' ? '#ffffff' : '#94a3b8',
-                      fontSize: '0.85rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      transition: 'all 0.15s ease',
-                      boxShadow: upiPaymentTab === 'upi' ? '0 4px 14px rgba(99, 102, 241, 0.4)' : 'none'
-                    }}
-                  >
-                    <span>⚡</span> UPI
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setUpiPaymentTab('qr')}
-                    style={{
-                      flex: 1,
-                      padding: '9px 12px',
-                      borderRadius: 8,
-                      border: 'none',
-                      background: upiPaymentTab === 'qr' ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : 'transparent',
-                      color: upiPaymentTab === 'qr' ? '#ffffff' : '#94a3b8',
-                      fontSize: '0.85rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      transition: 'all 0.15s ease',
-                      boxShadow: upiPaymentTab === 'qr' ? '0 4px 14px rgba(99, 102, 241, 0.4)' : 'none'
-                    }}
-                  >
-                    <span>📷</span> QR Code
-                  </button>
+                  {errorMsg}
                 </div>
-
-                {/* TAB 1: DIRECT UPI (DEFAULT) */}
-                {upiPaymentTab === 'upi' && (
-                  <div style={{ marginBottom: 12 }}>
-                    <button
-                      type="button"
-                      onClick={() => handleLaunchUpi(upiLink)}
-                      disabled={loading}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 8,
-                        width: '100%',
-                        padding: '14px 16px',
-                        borderRadius: 10,
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        color: '#ffffff',
-                        fontSize: '1rem',
-                        fontWeight: 800,
-                        border: 'none',
-                        cursor: 'pointer',
-                        marginBottom: 10,
-                        boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)',
-                        transition: 'transform 0.1s ease',
-                        boxSizing: 'border-box'
-                      }}
-                    >
-                      <span>⚡</span> {loading ? 'Processing Payment...' : `Pay ₹${(pendingOrder.breakdown.totalChargedPaise / 100).toFixed(2)}`}
-                    </button>
-
-                    <div style={{ textAlign: 'center', fontSize: '0.72rem', color: '#64748b' }}>
-                      Clicking Pay will open your UPI app and automatically submit your booking confirmation.
-                    </div>
-                  </div>
-                )}
-
-                {/* TAB 2: QR CODE */}
-                {upiPaymentTab === 'qr' && (
-                  <div style={{ marginBottom: 12 }}>
-                    {upiData.qrCode ? (
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{
-                          display: 'inline-block',
-                          padding: 10,
-                          background: '#ffffff',
-                          borderRadius: 14,
-                          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.35)'
-                        }}>
-                          <img
-                            src={upiData.qrCode}
-                            alt="UPI Payment QR Code"
-                            style={{ width: 190, height: 190, display: 'block', borderRadius: 8 }}
-                          />
-                        </div>
-                        <div style={{ fontSize: '0.76rem', color: '#cbd5e1', fontWeight: 600, marginTop: 8, marginBottom: 12 }}>
-                          Scan with any UPI App to Pay
-                        </div>
-
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          style={{
-                            width: '100%',
-                            padding: '12px',
-                            fontSize: '0.92rem',
-                            fontWeight: 700,
-                            borderRadius: 10,
-                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                            color: '#ffffff',
-                            border: 'none',
-                            cursor: 'pointer',
-                            boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)'
-                          }}
-                          onClick={handleVerifyUpiPayment}
-                          disabled={loading}
-                        >
-                          {loading ? 'Confirming Payment...' : 'I Have Scanned & Paid'}
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', fontSize: '0.82rem' }}>
-                        Generating UPI QR Code...
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {errorMsg && (
-                  <div style={{
-                    padding: '8px 12px',
-                    borderRadius: 8,
-                    background: 'rgba(239, 68, 68, 0.15)',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                    color: '#fca5a5',
-                    fontSize: '0.78rem',
-                    marginTop: 10
-                  }}>
-                    {errorMsg}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
 
       {/* STEP 4: CONFIRMATION */}
       {step === 'status' && confirmedOrder && (

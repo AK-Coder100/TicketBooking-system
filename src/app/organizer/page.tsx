@@ -372,7 +372,7 @@ function OrganizerDashboardInner() {
       setQrModalData({
         isOpen: true,
         title,
-        subtitle: subtitle || 'Scan to book tickets instantly via direct UPI',
+        subtitle: subtitle || 'Scan to book tickets instantly via Paytm Payment Gateway',
         url: fullUrl,
         qrDataUrl
       });
@@ -487,7 +487,7 @@ function OrganizerDashboardInner() {
       // Footer Notes
       ctx.fillStyle = '#64748b';
       ctx.font = '600 20px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-      ctx.fillText('Direct UPI Payment • Fast Entry Gate Verification', width / 2, cardMargin + cardHeight - 35);
+      ctx.fillText('Paytm Payment Gateway • Fast Entry Gate Verification', width / 2, cardMargin + cardHeight - 35);
 
       // Convert to blob and download
       canvas.toBlob((blob) => {

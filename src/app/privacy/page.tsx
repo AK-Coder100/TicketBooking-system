@@ -80,7 +80,7 @@ export default function PrivacyPolicyPage() {
             We prioritize financial security. <b>We do NOT store, process, or capture your credit/debit card numbers, CVVs, net banking passwords, or UPI PINs on our servers.</b>
           </p>
           <p style={{ marginTop: 8 }}>
-            All payment transactions are processed through RBI-authorized, PCI-DSS Level 1 compliant payment gateways (such as Cashfree Payments and Razorpay). All data transmission during checkout is secured using 256-bit TLS/SSL encryption.
+            All payment transactions are processed through RBI-authorized, PCI-DSS Level 1 compliant payment gateways (Paytm Payment Gateway). All data transmission during checkout is secured using 256-bit TLS/SSL encryption.
           </p>
         </section>
 
@@ -93,7 +93,7 @@ export default function PrivacyPolicyPage() {
           </p>
           <ul style={{ paddingLeft: 20, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <li><b>Event Organizers:</b> Attendee names and ticket tier details necessary for venue entry and security screening.</li>
-            <li><b>Payment Processors:</b> Regulated payment aggregators (Cashfree / Razorpay) for transaction settlement.</li>
+            <li><b>Payment Processors:</b> Regulated payment aggregators (Paytm Payment Gateway) for transaction settlement.</li>
             <li><b>Communication Providers:</b> Meta WhatsApp Business API for automated ticket delivery.</li>
             <li><b>Legal Authorities:</b> When mandated by applicable Indian laws, court orders, or law enforcement requests.</li>
           </ul>

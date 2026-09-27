@@ -85,7 +85,7 @@ export default function RefundsAndCancellationsPage() {
             If money was debited from your bank account or UPI application but an order failed to generate a ticket due to a network timeout:
           </p>
           <ul style={{ paddingLeft: 20, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <li>Payment gateways (Cashfree / Razorpay) perform automated daily reconciliation.</li>
+            <li>Payment gateways (Paytm Payment Gateway) perform automated daily reconciliation.</li>
             <li>Unclaimed deducted funds are automatically reversed to the original payment source within <b>5 to 7 working days</b>.</li>
             <li>For payment verification support, contact our helpline with your bank transaction reference / UTR number.</li>
           </ul>

@@ -109,7 +109,7 @@ export default function TermsAndConditionsPage() {
             6. Payment Gateway Compliance
           </h2>
           <p>
-            All online transactions are processed through authorized payment aggregators (Cashfree Payments and Razorpay) using 256-bit SSL encryption. We do not store raw credit card numbers or UPI PINs.
+            All online transactions are processed through authorized payment aggregators (Paytm Payment Gateway) using 256-bit SSL encryption. We do not store raw credit card numbers or UPI PINs.
           </p>
         </section>
 
