@@ -111,18 +111,48 @@ export class PaytmChecksum {
 // CONFIG HELPERS
 // ──────────────────────────────────────────────────────────────────────────
 
+import fs from 'node:fs';
+import path from 'node:path';
+
+function getLiveEnv(key, defaultVal = '') {
+  try {
+    const envPath = path.join(process.cwd(), '.env');
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8');
+      const lines = content.split(/\r?\n/);
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('#') || !trimmed.includes('=')) continue;
+        const eqIdx = trimmed.indexOf('=');
+        const k = trimmed.substring(0, eqIdx).trim();
+        if (k === key) {
+          let val = trimmed.substring(eqIdx + 1).trim();
+          val = val.replace(/^["']|["']$/g, '');
+          if (val) return val;
+        }
+      }
+    }
+  } catch (e) {}
+  return process.env[key] || defaultVal;
+}
+
 export function getPaytmConfig() {
-  const isStaging = process.env.PAYTM_ENVIRONMENT === 'STAGING' || process.env.PAYTM_ENVIRONMENT === 'TEST';
-  const merchantKey = (process.env.PAYTM_MERCHANT_KEY || 'zFOtTSahK6#Hq_V9').replace(/^["']|["']$/g, '').trim();
-  const merchantId = (process.env.PAYTM_MERCHANT_ID || 'UHYEFn90798504990109').replace(/^["']|["']$/g, '').trim();
+  const envType = getLiveEnv('PAYTM_ENVIRONMENT', 'STAGING');
+  const isStaging = envType === 'STAGING' || envType === 'TEST';
+  const merchantKey = getLiveEnv('PAYTM_MERCHANT_KEY', 'zFOtTSahK6#Hq_V9');
+  const merchantId = getLiveEnv('PAYTM_MERCHANT_ID', 'UHYEFn90798504990109');
+  const website = getLiveEnv('PAYTM_WEBSITE', isStaging ? 'WEBSTAGING' : 'DEFAULT');
+  const industryType = getLiveEnv('PAYTM_INDUSTRY_TYPE', 'Retail');
+  const channelWeb = getLiveEnv('PAYTM_CHANNEL_ID_WEB', 'WEB');
+  const channelWap = getLiveEnv('PAYTM_CHANNEL_ID_WAP', 'WAP');
 
   return {
     mid: merchantId,
     key: merchantKey,
-    website: (process.env.PAYTM_WEBSITE || (isStaging ? 'WEBSTAGING' : 'DEFAULT')).replace(/^["']|["']$/g, '').trim(),
-    industryType: (process.env.PAYTM_INDUSTRY_TYPE || 'Retail').replace(/^["']|["']$/g, '').trim(),
-    channelWeb: (process.env.PAYTM_CHANNEL_ID_WEB || 'WEB').replace(/^["']|["']$/g, '').trim(),
-    channelWap: (process.env.PAYTM_CHANNEL_ID_WAP || 'WAP').replace(/^["']|["']$/g, '').trim(),
+    website: website,
+    industryType: industryType,
+    channelWeb: channelWeb,
+    channelWap: channelWap,
     environment: isStaging ? 'STAGING' : 'PRODUCTION',
     processTxnUrl: isStaging
       ? 'https://securegw-stage.paytm.in/order/process'
@@ -141,7 +171,7 @@ export function getPaytmConfig() {
 // ──────────────────────────────────────────────────────────────────────────
 
 /**
- * Creates Paytm Redirection Form Parameters with verified Checksum
+ * Creates Paytm Redirection Form Parameters with verified Checksum (Initiate Transaction V1 + Classic fallback)
  */
 export async function createPaytmPayment(params) {
   const config = getPaytmConfig();
@@ -159,6 +189,78 @@ export async function createPaytmPayment(params) {
   const baseUrl = (process.env.BASE_URL || 'https://event.neoclare.com').replace(/\/$/, '');
   const callbackUrl = params.callbackUrl || `${baseUrl}/api/client/paytm/callback`;
 
+  // 1. Try modern Initiate Transaction API (V1 S2S) to obtain authenticated txnToken
+  let txnToken = null;
+  let showPaymentPageUrl = null;
+
+  try {
+    const s2sBody = {
+      requestType: 'Payment',
+      mid: config.mid,
+      websiteName: config.website,
+      orderId: orderId,
+      callbackUrl: callbackUrl,
+      txnAmount: {
+        value: amountVal.toFixed(2),
+        currency: 'INR'
+      },
+      userInfo: {
+        custId: custId
+      }
+    };
+
+    if (mobileNo && mobileNo.length === 10) {
+      s2sBody.userInfo.mobile = mobileNo;
+    }
+    if (email) {
+      s2sBody.userInfo.email = email;
+    }
+
+    const bodyString = JSON.stringify(s2sBody);
+    const signature = await PaytmChecksum.generateSignatureByString(bodyString, config.key);
+    const initiateUrl = `${config.initiateTxnUrl}?mid=${encodeURIComponent(config.mid)}&orderId=${encodeURIComponent(orderId)}`;
+
+    const initRes = await fetch(initiateUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        body: s2sBody,
+        head: { signature }
+      })
+    });
+
+    const initData = await initRes.json();
+
+    if (initData?.body?.txnToken) {
+      txnToken = initData.body.txnToken;
+      const baseHost = config.environment === 'STAGING' ? 'https://securegw-stage.paytm.in' : 'https://securegw.paytm.in';
+      showPaymentPageUrl = `${baseHost}/theia/api/v1/showPaymentPage?mid=${encodeURIComponent(config.mid)}&orderId=${encodeURIComponent(orderId)}`;
+    }
+  } catch (initErr) {
+    console.warn('Paytm initiateTransaction error:', initErr);
+  }
+
+  // If txnToken is successfully obtained, submit via showPaymentPage (Zero Checksum Error)
+  if (txnToken && showPaymentPageUrl) {
+    const paytmParams = {
+      mid: config.mid,
+      orderId: orderId,
+      txnToken: txnToken
+    };
+
+    return {
+      orderId,
+      amount: amountVal,
+      mid: config.mid,
+      processTxnUrl: showPaymentPageUrl,
+      paytmParams,
+      txnToken,
+      checksum: txnToken,
+      callbackUrl
+    };
+  }
+
+  // 2. Fallback to classic order/process
   const paytmParams = {
     MID: config.mid,
     WEBSITE: config.website,

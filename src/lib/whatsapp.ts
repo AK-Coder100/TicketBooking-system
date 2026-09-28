@@ -24,15 +24,16 @@ export async function sendWhatsAppTicketMessage({
   const ticket: any = await db
     .prepare(
       `SELECT tk.*, o.customer_phone, o.customer_name, o.id as order_id,
-              e.title as event_title, e.location as event_location,
+              COALESCE(e.title, o.event_title, 'Live Event') as event_title,
+              COALESCE(e.location, 'Gorakhpur') as event_location,
               e.start_date, e.end_date,
-              t.name as tenant_name,
-              tt.name as tier_name, tt.valid_date
+              COALESCE(t.name, 'EventHub') as tenant_name,
+              COALESCE(tt.name, 'Entry Pass') as tier_name, tt.valid_date
        FROM tickets tk
        JOIN orders o ON tk.order_id = o.id
-       JOIN ticket_tiers tt ON tk.tier_id = tt.id
-       JOIN events e ON tt.event_id = e.id
-       JOIN tenants t ON o.tenant_id = t.id
+       LEFT JOIN ticket_tiers tt ON tk.tier_id = tt.id
+       LEFT JOIN events e ON tt.event_id = e.id
+       LEFT JOIN tenants t ON o.tenant_id = t.id
        WHERE tk.id = ?`
     )
     .get(ticketId);

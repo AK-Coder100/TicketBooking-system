@@ -38,7 +38,13 @@ export default function TenantCheckoutPage() {
   const [customerName, setCustomerName] = useState('');
 
   // Multi-step flow: 'select' -> 'attendees' -> 'status'
-  const [step, setStep] = useState<'select' | 'attendees' | 'status'>('select');
+  const [step, setStep] = useState<'select' | 'attendees' | 'status'>(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('orderId')) return 'status';
+    }
+    return searchParams.get('orderId') ? 'status' : 'select';
+  });
   const [sessionToken, setSessionToken] = useState('');
 
   // 10-Minute Reservation Lock Timer State
@@ -114,22 +120,44 @@ export default function TenantCheckoutPage() {
     }
 
     if (orderIdParam) {
+      setStep('status');
       fetch(`/api/client/orders/${orderIdParam}`)
         .then(res => res.json())
         .then(async data => {
           if (data.success && data.order) {
             setConfirmedOrder(data.order);
-            setConfirmedTickets(data.tickets || []);
+            const rawTickets = data.tickets || [];
+            setConfirmedTickets(rawTickets);
             const qrs: Record<string, string> = {};
-            for (const t of (data.tickets || [])) {
-              const qr = await QRCode.toDataURL(t.qr_secret_token, { width: 240, margin: 1 });
-              qrs[t.id] = qr;
+            for (const t of rawTickets) {
+              try {
+                const qrContent = t.qr_secret_token || `TKT:${t.id}:${data.order.id}`;
+                const qr = await QRCode.toDataURL(qrContent, { width: 240, margin: 1 });
+                qrs[t.id] = qr;
+              } catch (qrErr) {
+                console.warn('QR generation error for ticket:', t.id, qrErr);
+              }
             }
             setQrCodeMap(qrs);
             setStep('status');
+          } else {
+            setConfirmedOrder({
+              id: orderIdParam,
+              payment_status: paymentStatus || 'PAID',
+              payment_reference: errorParam ? decodeURIComponent(errorParam) : 'Order details loading...'
+            });
+            setStep('status');
           }
         })
-        .catch(err => console.warn('Order status fetch error:', err));
+        .catch(err => {
+          console.warn('Order status fetch error:', err);
+          setConfirmedOrder({
+            id: orderIdParam,
+            payment_status: paymentStatus || 'PAID',
+            payment_reference: 'Failed to retrieve order confirmation details'
+          });
+          setStep('status');
+        });
     }
   }, [searchParams]);
 
@@ -791,6 +819,20 @@ export default function TenantCheckoutPage() {
       )}
 
       {/* STEP 4: CONFIRMATION OR FAILURE */}
+      {step === 'status' && !confirmedOrder && (
+        <div className="glass-panel" style={{ padding: '36px 20px', textAlign: 'center', borderRadius: 16, border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+          <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(99, 102, 241, 0.2)', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', margin: '0 auto 16px' }}>
+            🎟️
+          </div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: 8, color: '#f8fafc' }}>
+            Verifying Payment & Retrieving Passes...
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0 auto', maxWidth: 420 }}>
+            Please wait while we load your booking confirmation and digital entry tickets.
+          </p>
+        </div>
+      )}
+
       {step === 'status' && confirmedOrder && (
         <div>
           {confirmedOrder.payment_status === 'FAILED' || searchParams.get('paymentStatus') === 'FAILED' ? (

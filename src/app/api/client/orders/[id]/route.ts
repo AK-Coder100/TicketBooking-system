@@ -14,10 +14,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!order) return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
 
     const tickets = await db.prepare(`
-      SELECT tk.*, tt.name as tier_name, tt.valid_date, e.title as event_title, e.location as event_location, e.start_date, e.end_date, e.banner_url
+      SELECT tk.*, COALESCE(tt.name, 'Ticket') as tier_name, tt.valid_date,
+             COALESCE(e.title, o.event_title, 'Event') as event_title,
+             e.location as event_location, e.start_date, e.end_date, e.banner_url
       FROM tickets tk
-      JOIN ticket_tiers tt ON tk.tier_id = tt.id
-      JOIN events e ON tt.event_id = e.id
+      JOIN orders o ON tk.order_id = o.id
+      LEFT JOIN ticket_tiers tt ON tk.tier_id = tt.id
+      LEFT JOIN events e ON tt.event_id = e.id
       WHERE tk.order_id = ?
     `).all(order.id);
 

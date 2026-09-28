@@ -157,12 +157,14 @@ async function handlePaytmCallbackData(request: NextRequest, isGetMethod = false
       WHERE t.order_id = ?
     `).all(orderId);
 
-    for (const t of tickets) {
-      sendWhatsAppTicketMessage({
-        ticketId: t.id,
-        toPhone: order.customer_phone
-      }).catch(err => console.warn(`WhatsApp dispatch error for ticket ${t.id}:`, err));
-    }
+    await Promise.allSettled(
+      tickets.map(t =>
+        sendWhatsAppTicketMessage({
+          ticketId: t.id,
+          toPhone: order.customer_phone
+        }).catch(err => console.warn(`WhatsApp dispatch error for ticket ${t.id}:`, err))
+      )
+    );
 
     // 5. Redirect back to checkout confirmation screen over HTTPS
     const redirectUrl = `${origin}/${tenantSlug}/checkout?orderId=${encodeURIComponent(orderId)}&paymentStatus=PAID&txnId=${encodeURIComponent(finalTxnId)}`;
