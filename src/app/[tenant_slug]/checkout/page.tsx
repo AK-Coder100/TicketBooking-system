@@ -32,9 +32,10 @@ export default function TenantCheckoutPage() {
   // Attendees list: 1 entry per ticket with assigned tier
   const [attendees, setAttendees] = useState<Attendee[]>([]);
 
-  // WhatsApp receiving number & email
+  // WhatsApp receiving number, email & customer name
   const [whatsappPhone, setWhatsappPhone] = useState('');
   const [custEmail, setCustEmail] = useState('');
+  const [customerName, setCustomerName] = useState('');
 
   // Multi-step flow: 'select' -> 'attendees' -> 'status'
   const [step, setStep] = useState<'select' | 'attendees' | 'status'>('select');
@@ -268,8 +269,8 @@ export default function TenantCheckoutPage() {
         for (let i = 0; i < item.quantity; i++) {
           newAttendeesList.push({
             id: `att_${Date.now()}_${attIndex}`,
-            name: `Guest ${attIndex}`,
-            age: '18',
+            name: '',
+            age: '',
             tierId: item.tierId,
             tierName: tierObj?.name || 'Ticket',
             price_in_paise: tierObj?.price_in_paise || 0
@@ -330,6 +331,7 @@ export default function TenantCheckoutPage() {
     setErrorMsg(null);
     try {
       const primaryTierId = attendees[0]?.tierId || sortedFilteredTiers[0]?.id;
+      const enteredName = customerName.trim();
 
       const res = await fetch('/api/client/checkout', {
         method: 'POST',
@@ -338,12 +340,12 @@ export default function TenantCheckoutPage() {
           tierId: primaryTierId,
           quantity: attendees.length,
           sessionToken,
-          customerName: attendees[0]?.name || 'Guest',
+          customerName: enteredName,
           customerPhone: whatsappPhone.trim(),
           customerEmail: custEmail.trim(),
           attendees: attendees.map((a, idx) => ({
-            name: a.name || `Guest ${idx + 1}`,
-            age: parseInt(a.age, 10) || 18,
+            name: enteredName ? (attendees.length > 1 ? `${enteredName} (Pass #${idx + 1})` : enteredName) : (attendees.length > 1 ? `Pass #${idx + 1}` : ''),
+            age: 0,
             tierId: a.tierId
           }))
         })
@@ -660,6 +662,18 @@ export default function TenantCheckoutPage() {
                   style={{ padding: '6px 10px', fontSize: '0.85rem' }}
                 />
               </div>
+
+              <div className="form-group" style={{ marginTop: 10, marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: '0.72rem' }}>Full Name (Optional)</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Enter your name"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  style={{ padding: '6px 10px', fontSize: '0.85rem' }}
+                />
+              </div>
             </div>
 
             {/* Price Breakdown */}
@@ -776,10 +790,50 @@ export default function TenantCheckoutPage() {
         </div>
       )}
 
-      {/* STEP 4: CONFIRMATION */}
+      {/* STEP 4: CONFIRMATION OR FAILURE */}
       {step === 'status' && confirmedOrder && (
         <div>
-          {confirmedOrder.payment_status === 'PENDING' ? (
+          {confirmedOrder.payment_status === 'FAILED' || searchParams.get('paymentStatus') === 'FAILED' ? (
+            <div className="glass-panel" style={{ padding: '24px 18px', marginBottom: 16, textAlign: 'center', borderRadius: 16, border: '1px solid rgba(244, 63, 94, 0.35)' }}>
+              <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(244, 63, 94, 0.2)', color: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', margin: '0 auto 12px' }}>
+                ✕
+              </div>
+              <span style={{ background: 'rgba(244, 63, 94, 0.2)', color: '#fca5a5', padding: '4px 12px', borderRadius: 16, fontSize: '0.74rem', fontWeight: 800 }}>
+                PAYMENT UNSUCCESSFUL
+              </span>
+              <h1 style={{ fontSize: '1.35rem', fontWeight: 800, marginTop: 10, marginBottom: 6, color: '#f87171' }}>
+                Payment Failed
+              </h1>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: '0 auto 10px', maxWidth: 460 }}>
+                {errorMsg ? errorMsg.replace(/^Payment:\s*/, '') : (confirmedOrder.payment_reference || 'The transaction could not be verified or was declined by the bank.')}
+              </p>
+
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+                <span style={{ background: 'rgba(244, 63, 94, 0.12)', border: '1px solid rgba(244, 63, 94, 0.3)', color: '#fca5a5', padding: '3px 10px', borderRadius: 6, fontSize: '0.74rem', fontFamily: 'monospace' }}>
+                  <b>Order ID:</b> {confirmedOrder.id}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 12 }}>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => {
+                    setConfirmedOrder(null);
+                    setConfirmedTickets([]);
+                    setStep('select');
+                    window.history.replaceState({}, '', `/${tenantSlug}/checkout`);
+                  }}
+                  style={{ padding: '8px 16px', fontSize: '0.85rem', fontWeight: 700 }}
+                >
+                  🔄 Try Again
+                </button>
+                <Link href={`/${tenantSlug}`} className="btn btn-secondary btn-sm" style={{ textDecoration: 'none', padding: '8px 16px', fontSize: '0.85rem' }}>
+                  🏠 Discover Events
+                </Link>
+              </div>
+            </div>
+          ) : confirmedOrder.payment_status === 'PENDING' ? (
             <div className="glass-panel" style={{ padding: '24px 18px', marginBottom: 16, textAlign: 'center', borderRadius: 16, border: '1px solid rgba(59, 130, 246, 0.3)' }}>
               <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', margin: '0 auto 12px' }}>
                 ⏳
@@ -812,7 +866,7 @@ export default function TenantCheckoutPage() {
               <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: 14, borderRadius: 12, border: '1px solid rgba(255, 255, 255, 0.08)', textAlign: 'left', marginTop: 8 }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>What Happens Next?</div>
                 <ul style={{ margin: 0, paddingLeft: 18, fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.6' }}>
-                  <li>Our event team checks the bank account to verify your UPI payment.</li>
+                  <li>Our event team checks the bank account to verify your payment.</li>
                   <li>Once approved, your official entry pass with digital QR code will be dispatched directly to your WhatsApp.</li>
                   <li>No further action is required from your side.</li>
                 </ul>
@@ -840,7 +894,7 @@ export default function TenantCheckoutPage() {
             </div>
           )}
 
-          {confirmedTickets.length > 0 ? (
+          {confirmedOrder.payment_status === 'PAID' && confirmedTickets.length > 0 ? (
             <div>
               <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: 12 }}>
                 Digital Entry Passes ({confirmedTickets.length})
@@ -865,10 +919,10 @@ export default function TenantCheckoutPage() {
                         TICKET #{idx + 1} &nbsp;•&nbsp; {t.tier_name || 'Ticket'}
                       </span>
                       <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginTop: 2, marginBottom: 4 }}>
-                        {t.attendee_name}
+                        {t.attendee_name || confirmedOrder?.customer_name || 'Entry Pass'}
                       </h3>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        Age: <b>{t.attendee_age}</b> &nbsp;•&nbsp; ID: <code>{t.id}</code>
+                        {t.attendee_age > 0 ? `Age: ${t.attendee_age} • ` : ''}ID: <code>{t.id}</code>
                       </div>
 
                       <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -912,12 +966,12 @@ export default function TenantCheckoutPage() {
             <div className="glass-panel" style={{ padding: 16, borderRadius: 12, marginBottom: 20 }}>
               <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f8fafc', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span>👥</span>
-                <span>Registered Attendees ({attendees.length || 1})</span>
+                <span>Tickets ({attendees.length || 1})</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {attendees.map((att, i) => (
                   <div key={att.id || i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#cbd5e1', padding: '6px 10px', background: 'rgba(255,255,255,0.02)', borderRadius: 6 }}>
-                    <span><b>#{i + 1}</b> {att.name || 'Guest'} (Age: {att.age || '18'})</span>
+                    <span><b>Pass #{i + 1}</b> {att.name ? `(${att.name})` : ''}</span>
                     <span style={{ color: '#818cf8', fontWeight: 600 }}>{att.tierName || 'Pass'}</span>
                   </div>
                 ))}

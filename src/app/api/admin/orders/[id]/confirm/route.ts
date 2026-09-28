@@ -91,8 +91,8 @@ export async function POST(
         : bookedTier;
 
       const ticketId = generateTicketId(orderId, i);
-      const attendeeName = att.name?.trim() || `${order.customer_name} (Guest ${i + 1})`;
-      const attendeeAge = parseInt(String(att.age), 10) || 25;
+      const attendeeName = att.name?.trim() || order.customer_name || (attendeeList.length > 1 ? `Pass #${i + 1}` : 'Pass Holder');
+      const attendeeAge = parseInt(String(att.age), 10) || 0;
 
       const token = generateTicketToken({
         ticketId,

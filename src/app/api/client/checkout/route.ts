@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       attendees       // [{ name, age, tierId? }] — each can have own tier
     } = body;
 
-    const finalCustomerName = (customerName || 'Guest').trim();
+    const finalCustomerName = (customerName || '').trim();
     if (!tierId || !sessionToken || !customerPhone) {
       return NextResponse.json(
         { success: false, error: 'Tier, sessionToken, and customerPhone are required' },
@@ -36,17 +36,17 @@ export async function POST(request: NextRequest) {
       }, { status: 410 });
     }
 
-    // Resolve attendee list (fall back to single primary if not provided)
+    // Resolve attendee list (fall back to clean pass identifiers if not provided)
     const attendeeList: Array<{ name: string; age: number; tierId?: string }> =
       Array.isArray(attendees) && attendees.length > 0
-        ? attendees.map((a: any) => ({
-            name: (a.name || finalCustomerName).trim(),
-            age: parseInt(a.age, 10) || 18,
+        ? attendees.map((a: any, idx: number) => ({
+            name: (a.name || finalCustomerName || (attendees.length > 1 ? `Pass #${idx + 1}` : 'Pass Holder')).trim(),
+            age: parseInt(a.age, 10) || 0,
             tierId: a.tierId || tierId
           }))
-        : Array.from({ length: parseInt(quantity, 10) || 1 }, () => ({
-            name: finalCustomerName,
-            age: 18,
+        : Array.from({ length: parseInt(quantity, 10) || 1 }, (_, idx) => ({
+            name: finalCustomerName || (quantity > 1 ? `Pass #${idx + 1}` : 'Pass Holder'),
+            age: 0,
             tierId
           }));
 

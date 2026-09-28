@@ -1118,11 +1118,11 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                             whiteSpace: 'nowrap'
                           }}>
                             {p.attendee_name}
-                            {p.attendee_age && (
+                            {Number(p.attendee_age) > 0 ? (
                               <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 500, marginLeft: 6 }}>
                                 ({p.attendee_age} yrs)
                               </span>
-                            )}
+                            ) : null}
                           </div>
                           <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
                             <span>Pass:</span>
@@ -1458,7 +1458,7 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                         >
                           <td style={{ padding: '12px 16px' }}>
                             <div style={{ fontWeight: 700, color: '#ffffff' }}>
-                              {p.attendee_name} {p.attendee_age && <span style={{ color: '#94a3b8', fontSize: '0.74rem' }}>({p.attendee_age}y)</span>}
+                              {p.attendee_name} {Number(p.attendee_age) > 0 ? <span style={{ color: '#94a3b8', fontSize: '0.74rem' }}>({p.attendee_age}y)</span> : null}
                             </div>
                             <div style={{ fontSize: '0.72rem', color: '#38bdf8', fontFamily: 'monospace', marginTop: 2 }}>
                               {p.ticket_id}
@@ -1889,7 +1889,9 @@ function EventMembersContent({ eventId }: { eventId: string }) {
                   Attendee Details
                 </div>
                 <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#f8fafc' }}>{selectedParticipant.attendee_name}</div>
-                <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: 2 }}>Age: {selectedParticipant.attendee_age || 'Not specified'}</div>
+                {Number(selectedParticipant.attendee_age) > 0 ? (
+                  <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: 2 }}>Age: {selectedParticipant.attendee_age}</div>
+                ) : null}
                 <div style={{ fontSize: '0.74rem', color: '#38bdf8', marginTop: 4, fontFamily: 'monospace' }}>
                   ID: {selectedParticipant.ticket_id}
                 </div>
