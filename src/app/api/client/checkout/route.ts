@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { getActiveReservation } from '@/lib/reservation';
 import { computeSplitRules, PaymentService } from '@/lib/payment';
 import { generateOrderId } from '@/lib/id';
+import { getRequestOrigin } from '@/lib/url';
 import crypto from 'node:crypto';
 
 export async function POST(request: NextRequest) {
@@ -149,7 +150,7 @@ export async function POST(request: NextRequest) {
     let gatewayOrder: any;
     try {
       const isMobile = request.headers.get('user-agent')?.toLowerCase().includes('mobile') || false;
-      const origin = request.headers.get('origin') || request.headers.get('host') ? `http://${request.headers.get('host')}` : (process.env.BASE_URL || 'http://localhost:5000');
+      const origin = getRequestOrigin(request);
       const callbackUrl = `${origin}/api/client/paytm/callback`;
 
       gatewayOrder = await adapter.createOrder({

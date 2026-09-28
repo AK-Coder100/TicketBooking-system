@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import QRCode from 'qrcode';
+import { getRequestOrigin } from '@/lib/url';
 
 export async function GET(
   request: NextRequest,
@@ -17,7 +18,7 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'Tenant not found' }, { status: 404 });
     }
 
-    const origin = request.headers.get('origin') || request.headers.get('host') ? `http://${request.headers.get('host')}` : 'http://localhost:5000';
+    const origin = getRequestOrigin(request);
     const targetUrl = `${origin}/${tenant.slug}`;
 
     const sizeParam = request.nextUrl.searchParams.get('size');

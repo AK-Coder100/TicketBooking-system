@@ -160,7 +160,7 @@ export async function createPaytmPayment(params) {
   const email = params.customerEmail || `${custId}@customer.com`;
   const channelId = params.isMobile ? config.channelWap : config.channelWeb;
 
-  const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+  const baseUrl = (process.env.BASE_URL || 'https://event.neoclare.com').replace(/\/$/, '');
   const callbackUrl = params.callbackUrl || `${baseUrl}/api/client/paytm/callback`;
 
   const paytmParams = {

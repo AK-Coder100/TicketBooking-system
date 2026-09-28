@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createPaytmPayment } from '@/Services/PaytmService';
+import { getRequestOrigin } from '@/lib/url';
 
 export async function GET(
   request: NextRequest,
@@ -33,7 +34,7 @@ export async function GET(
 
     const amountRupees = Number((order.total_charged / 100).toFixed(2));
     const isMobile = request.headers.get('user-agent')?.toLowerCase().includes('mobile') || false;
-    const origin = request.headers.get('origin') || request.headers.get('host') ? `http://${request.headers.get('host')}` : (process.env.BASE_URL || 'http://localhost:5000');
+    const origin = getRequestOrigin(request);
     const callbackUrl = `${origin}/api/client/paytm/callback`;
 
     const paytmData = await createPaytmPayment({

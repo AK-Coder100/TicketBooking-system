@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { verifyPaytmCallback } from '@/Services/PaytmService';
 import { consumeReservation } from '@/lib/reservation';
 import { sendWhatsAppTicketMessage } from '@/lib/whatsapp';
+import { getRequestOrigin } from '@/lib/url';
 import crypto from 'node:crypto';
 
 export async function POST(request: NextRequest) {
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     const tenantSlug = order.tenant_slug || 'default';
-    const origin = request.headers.get('origin') || request.headers.get('host') ? `http://${request.headers.get('host')}` : (process.env.BASE_URL || 'http://localhost:5000');
+    const origin = getRequestOrigin(request);
 
     if (verification.isSuccess) {
       // Mark order as PAID
