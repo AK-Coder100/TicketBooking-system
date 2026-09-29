@@ -222,86 +222,7 @@ async function resetDb() {
       ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = 'SUPER_ADMIN';
     `, [adminId, superAdminName, superAdminEmail, adminHash]);
 
-    // 3. Seed Primary Tenant: /dd-a (Dandiya)
-    const tenantDandiyaId = 'ten_dandiya';
-    await client.query(`
-      INSERT INTO tenants (
-        id, slug, name, gateway_account_id, fee_bearer_type, 
-        default_platform_fee, is_gateway_fee_passed_to_customer, status, 
-        contact_email, contact_phone, organizer_phone, event_creation_policy, created_at
-      ) VALUES (
-        $1, 'dd-a', 'Dandiya', 'MUHgMY57617969874640',
-        'USER', 200, 1, 'ACTIVE', 'organizer@neoclare.com', '7054916134, 7991665396', '7054916134, 7991665396', 'TENANT_ALLOWED', NOW()
-      )
-      ON CONFLICT (id) DO UPDATE SET 
-        name = EXCLUDED.name, 
-        slug = EXCLUDED.slug, 
-        contact_phone = EXCLUDED.contact_phone,
-        organizer_phone = EXCLUDED.organizer_phone;
-    `, [tenantDandiyaId]);
-
-    // 4. Seed Tenant Admin for /dd-a
-    const organizerHash = bcrypt.hashSync('organizer123', 10);
-    await client.query(`
-      INSERT INTO users (id, tenant_id, role, tenant_role, can_create_events, name, email, phone, password_hash, created_at)
-      VALUES ($1, $2, 'TENANT_ADMIN', 'OWNER', 1, 'Dandiya Organizer', 'organizer@neoclare.com', '7054916134', $3, NOW())
-      ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, tenant_id = $2, role = 'TENANT_ADMIN';
-    `, ['usr_organizer_dandiya', tenantDandiyaId, organizerHash]);
-
-    // 5. Seed Event for /dd-a
-    const eventId = 'evt_dandiya_2026';
-    const eventTitle = 'परंपरागत डांडिया महोत्सव 2026 - DANDIYA NIGHT';
-    const eventDesc = 'अन्नपूर्णा सेवा समिति Presents परंपरागत डांडिया महोत्सव 2026 (Dandiya Night). Event Organized by RB Garment Enterprises & Managed by SR Production. Live DJ, Dhol, Food Stall, Shopping Stall, Special Performance & Selfie Zone. आइए, परंपरा के रंग में रंगें, संस्कृति के संग नाचें... Contact: 7054488454, 8858152101, 7054916134, 7991665396';
-    const eventLocation = 'KACHERI Club, Town Hall, Gorakhpur, 273001';
-    const bannerUrl = '/dandiya-poster.png';
-
-    await client.query(`
-      INSERT INTO events (id, tenant_id, title, banner_url, description, location, start_date, end_date, is_published, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, '2026-10-15T18:00:00Z', '2026-10-19T23:59:00Z', 1, NOW())
-      ON CONFLICT (id) DO UPDATE SET 
-        title = EXCLUDED.title, 
-        banner_url = EXCLUDED.banner_url, 
-        description = EXCLUDED.description, 
-        location = EXCLUDED.location;
-    `, [eventId, tenantDandiyaId, eventTitle, bannerUrl, eventDesc, eventLocation]);
-
-    // 6. Seed Event Sessions
-    const sessionId = 'sess_dandiya_day1';
-    await client.query(`
-      INSERT INTO event_sessions (id, event_id, name, session_date, start_time, end_time, venue_note, sort_order, created_at)
-      VALUES ($1, $2, 'Day 1 - Grand Garba & Dandiya Night', '2026-10-15', '06:00 PM', '11:00 PM', 'Gate opens at 5:30 PM. Traditional attire recommended.', 1, NOW())
-      ON CONFLICT (id) DO NOTHING;
-    `, [sessionId, eventId]);
-
-    // 7. Seed Ticket Tiers
-    await client.query(`
-      INSERT INTO ticket_tiers (id, event_id, session_id, name, price_in_paise, capacity, is_unlimited, valid_date, early_bird_deadline, created_at)
-      VALUES 
-      ('tier_dd_general_1', $1, $2, 'Single Entry Pass (Test ₹1)', 100, 500, 0, '2026-10-15', NULL, NOW()),
-      ('tier_dd_couple_3', $1, $2, 'Couple Entry Pass (Test ₹3)', 300, 300, 0, '2026-10-15', NULL, NOW()),
-      ('tier_dd_vip_5', $1, $2, 'VIP Family Pass (Test ₹5)', 500, 100, 0, '2026-10-15', NULL, NOW())
-      ON CONFLICT (id) DO UPDATE SET 
-        name = EXCLUDED.name, 
-        price_in_paise = EXCLUDED.price_in_paise;
-    `, [eventId, sessionId]);
-
-    // 8. Seed Secondary Tenant: /dandiya-2026 for compatibility
-    const tenantSrId = 'ten_sr_production';
-    await client.query(`
-      INSERT INTO tenants (
-        id, slug, name, gateway_account_id, fee_bearer_type, 
-        default_platform_fee, is_gateway_fee_passed_to_customer, status, 
-        contact_email, contact_phone, organizer_phone, event_creation_policy, created_at
-      ) VALUES (
-        $1, 'dandiya-2026', 'SR Production & RB Garment Enterprises', 'MUHgMY57617969874640',
-        'USER', 200, 1, 'ACTIVE', 'srproduction091@gmail.com', '7054916134, 7991665396', '7054916134, 7991665396', 'TENANT_ALLOWED', NOW()
-      )
-      ON CONFLICT (id) DO UPDATE SET 
-        organizer_phone = EXCLUDED.organizer_phone,
-        contact_phone = EXCLUDED.contact_phone;
-    `, [tenantSrId]);
-
-    console.log('✅ PostgreSQL database reset and seeded successfully!\n');
+    console.log('✅ PostgreSQL database reset successfully with clean schema!\n');
     console.log('───────────────────────────────────────────────────────────────────');
     console.log('👤 Super Admin Account:');
     console.log(`   Email:         ${superAdminEmail}`);
@@ -309,21 +230,11 @@ async function resetDb() {
     console.log(`   Role:          SUPER_ADMIN`);
     console.log(`   Admin Login:   /admin/login`);
     console.log('───────────────────────────────────────────────────────────────────');
-    console.log('🏢 Primary Tenant:');
-    console.log('   Tenant URL:    /dd-a');
-    console.log('   Tenant Name:   Dandiya');
-    console.log('   MID (Paytm):   MUHgMY57617969874640');
-    console.log('   WhatsApp Msg:  7054916134, 7991665396');
-    console.log('   Organizer Login: organizer@neoclare.com / organizer123');
-    console.log('───────────────────────────────────────────────────────────────────');
-    console.log('🎟️ Seeded Passes for /dd-a:');
-    console.log('   • Single Entry Pass:  ₹1.00 (100 paise)');
-    console.log('   • Couple Entry Pass:  ₹3.00 (300 paise)');
-    console.log('   • VIP Family Pass:    ₹5.00 (500 paise)');
-    console.log('───────────────────────────────────────────────────────────────────');
     console.log('📬 Queue Table:');
     console.log('   whatsapp_msg_in_queue is ready for microservice polling.');
-    console.log('───────────────────────────────────────────────────────────────────\n');
+    console.log('───────────────────────────────────────────────────────────────────');
+    console.log('ℹ️ Clean State: No dummy tenants or events seeded.');
+    console.log('   You can now create tenants and events directly via the Admin Portal.\n');
   } catch (err) {
     console.error('❌ Error resetting database:', err);
     process.exit(1);
