@@ -8,7 +8,7 @@ interface Props {
 export default async function TenantLandingPage({ params }: Props) {
   const { tenant_slug } = await params;
   await initSchema();
-  
+
   let tenant: any = null;
   let events: any[] = [];
   try {
@@ -37,10 +37,10 @@ export default async function TenantLandingPage({ params }: Props) {
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: 'linear-gradient(90deg, #6366f1, #ec4899)' }}></div>
         <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#818cf8', textTransform: 'uppercase' }}>OFFICIAL BOX OFFICE</span>
         <h1 style={{ fontSize: '2.4rem', fontWeight: 800, marginTop: 4 }}>{tenant.name}</h1>
-        <div style={{ display: 'flex', gap: 16, marginTop: 12, fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+        {/* <div style={{ display: 'flex', gap: 16, marginTop: 12, fontSize: '0.88rem', color: 'var(--text-muted)' }}>
           {tenant.contact_email && <span>📧 {tenant.contact_email}</span>}
           {tenant.contact_phone && <span>📱 {tenant.contact_phone}</span>}
-        </div>
+        </div> */}
       </div>
 
       <h2 style={{ fontSize: '1.4rem', marginBottom: 20 }}>Upcoming Events</h2>
