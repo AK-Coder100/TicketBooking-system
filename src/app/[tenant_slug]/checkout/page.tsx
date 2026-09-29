@@ -143,8 +143,8 @@ export default function TenantCheckoutPage() {
           } else {
             setConfirmedOrder({
               id: orderIdParam,
-              payment_status: paymentStatus || 'PAID',
-              payment_reference: errorParam ? decodeURIComponent(errorParam) : 'Order details loading...'
+              payment_status: 'FAILED',
+              payment_reference: data.error || 'Order not found in database'
             });
             setStep('status');
           }
@@ -153,8 +153,8 @@ export default function TenantCheckoutPage() {
           console.warn('Order status fetch error:', err);
           setConfirmedOrder({
             id: orderIdParam,
-            payment_status: paymentStatus || 'PAID',
-            payment_reference: 'Failed to retrieve order confirmation details'
+            payment_status: 'FAILED',
+            payment_reference: 'Failed to verify order status with server'
           });
           setStep('status');
         });
@@ -835,7 +835,7 @@ export default function TenantCheckoutPage() {
 
       {step === 'status' && confirmedOrder && (
         <div>
-          {confirmedOrder.payment_status === 'FAILED' || searchParams.get('paymentStatus') === 'FAILED' ? (
+          {confirmedOrder.payment_status === 'FAILED' ? (
             <div className="glass-panel" style={{ padding: '24px 18px', marginBottom: 16, textAlign: 'center', borderRadius: 16, border: '1px solid rgba(244, 63, 94, 0.35)' }}>
               <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(244, 63, 94, 0.2)', color: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', margin: '0 auto 12px' }}>
                 ✕
