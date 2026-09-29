@@ -7,7 +7,9 @@
     "dev": "next dev -p 5000",
     "build": "next build",
     "start": "next start -p 5000",
-    "test": "tsc --noEmit"
+    "test": "tsc --noEmit",
+    "reset-db": "node scripts/reset-db.mjs",
+    "view-db": "node scripts/view-db.mjs"
   },
   "keywords": [],
   "author": "",

@@ -39,6 +39,7 @@ async function viewDb() {
       'orders',
       'tickets',
       'ticket_audit_logs',
+      'whatsapp_msg_in_queue',
       'platform_settings'
     ];
 
