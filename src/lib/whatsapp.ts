@@ -360,11 +360,52 @@ export async function sendWhatsAppOrganizerPaymentNotification({
     if (uniquePhones.length === 0) uniquePhones.push('7054916134');
 
     const amountFormatted = `₹${((order.total_charged || order.total_base_price || 0) / 100).toFixed(2)}`;
-    const ticketCount = order.ticket_count || 1;
     const txnId = order.gateway_payment_id || order.payment_reference || 'Confirmed';
 
+    // Fetch individual ticket breakdown for this order
+    const tickets = await db.prepare(`
+      SELECT tk.id, tk.attendee_name, COALESCE(tt.name, 'Entry Pass') as tier_name
+      FROM tickets tk
+      LEFT JOIN ticket_tiers tt ON tk.tier_id = tt.id
+      WHERE tk.order_id = ?
+    `).all(orderId);
+
+    const tierBreakdownMap: Record<string, number> = {};
+    const attendeeNames: string[] = [];
+
+    if (tickets && tickets.length > 0) {
+      for (const t of tickets) {
+        const tierName = t.tier_name || 'Entry Pass';
+        tierBreakdownMap[tierName] = (tierBreakdownMap[tierName] || 0) + 1;
+        if (t.attendee_name && t.attendee_name !== 'Pass Holder') {
+          attendeeNames.push(t.attendee_name);
+        }
+      }
+    } else if (order.attendees_data) {
+      try {
+        const list = JSON.parse(order.attendees_data);
+        for (const item of list) {
+          const tierName = item.tierName || 'Entry Pass';
+          tierBreakdownMap[tierName] = (tierBreakdownMap[tierName] || 0) + 1;
+          if (item.name && item.name !== 'Pass Holder') attendeeNames.push(item.name);
+        }
+      } catch (e) {
+        tierBreakdownMap['Entry Pass'] = 1;
+      }
+    } else {
+      tierBreakdownMap['Entry Pass'] = 1;
+    }
+
+    const totalTickets = Object.values(tierBreakdownMap).reduce((a, b) => a + b, 0);
+
+    const tierBreakdownLines = Object.entries(tierBreakdownMap)
+      .map(([name, qty]) => `  ▫️ *${name}:* ${qty} ticket${qty > 1 ? 's' : ''}`)
+      .join('\n');
+
+    const customerDisplay = order.customer_name?.trim() || (attendeeNames[0] || 'Customer');
+
     const messageText =
-      `🎉 *Payment Received & Confirmed!*\n\n• *Tenant / Organizer:* ${order.tenant_name}\n• *Event:* ${order.event_title}\n• *Booking ID:* ${order.id}\n• *Customer:* ${order.customer_name || 'Customer'} (${order.customer_phone || ''})\n• *Amount Paid:* ${amountFormatted}\n• *Passes Issued:* ${ticketCount} Ticket(s)\n• *Paytm Txn ID:* ${txnId}\n• *Time:* ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`;
+      `🎉 *Payment Received & Confirmed!*\n\n• *Tenant / Organizer:* ${order.tenant_name}\n• *Event:* ${order.event_title}\n• *Booking ID:* ${order.id}\n• *Customer:* ${customerDisplay} (${order.customer_phone || 'N/A'})\n• *Amount Paid:* ${amountFormatted}\n• *Tickets Breakdown (${totalTickets} Total):*\n${tierBreakdownLines}\n${attendeeNames.length > 0 ? `• *Attendees:* ${attendeeNames.join(', ')}\n` : ''}• *Paytm Txn ID:* ${txnId}\n• *Time:* ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`;
 
     const queuedIds: string[] = [];
 
@@ -378,10 +419,12 @@ export async function sendWhatsAppOrganizerPaymentNotification({
         order_id: order.id,
         tenant_name: order.tenant_name,
         event_title: order.event_title,
-        customer_name: order.customer_name,
+        customer_name: customerDisplay,
         customer_phone: order.customer_phone,
         amount_charged_paise: order.total_charged,
-        ticket_count: ticketCount,
+        total_ticket_count: totalTickets,
+        tier_breakdown: tierBreakdownMap,
+        attendees: attendeeNames,
         txn_id: txnId
       };
 
@@ -394,8 +437,8 @@ export async function sendWhatsAppOrganizerPaymentNotification({
         queueId,
         cleanPhone,
         order.id,
-        order.customer_name,
-        order.event_title,
+        customerDisplay,
+        Object.keys(tierBreakdownMap).join(', '),
         order.tenant_name,
         messageText,
         messageText,
