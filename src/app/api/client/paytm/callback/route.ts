@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyPaytmCallback, checkPaytmStatus } from '@/Services/PaytmService';
 import { consumeReservation } from '@/lib/reservation';
-import { sendWhatsAppTicketMessage } from '@/lib/whatsapp';
+import { sendWhatsAppTicketMessage, sendWhatsAppOrganizerPaymentNotification } from '@/lib/whatsapp';
 import { getRequestOrigin } from '@/lib/url';
 import crypto from 'node:crypto';
 
@@ -157,14 +157,17 @@ async function handlePaytmCallbackData(request: NextRequest, isGetMethod = false
       WHERE t.order_id = ?
     `).all(orderId);
 
-    await Promise.allSettled(
-      tickets.map(t =>
+    await Promise.allSettled([
+      ...tickets.map(t =>
         sendWhatsAppTicketMessage({
           ticketId: t.id,
           toPhone: order.customer_phone
         }).catch(err => console.warn(`WhatsApp dispatch error for ticket ${t.id}:`, err))
-      )
-    );
+      ),
+      sendWhatsAppOrganizerPaymentNotification({
+        orderId: order.id
+      }).catch(err => console.warn(`WhatsApp organizer alert error for order ${order.id}:`, err))
+    ]);
 
     // 5. Redirect back to checkout confirmation screen over HTTPS
     const redirectUrl = `${origin}/${tenantSlug}/checkout?orderId=${encodeURIComponent(orderId)}&paymentStatus=PAID&txnId=${encodeURIComponent(finalTxnId)}`;

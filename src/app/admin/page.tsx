@@ -145,6 +145,8 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  const [editingTenant, setEditingTenant] = useState<any>(null);
+
   const toggleTenantStatus = async (id: string, currentStatus: string) => {
     const nextStatus = currentStatus === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
     await fetch(`/api/admin/tenants/${id}`, {
@@ -153,6 +155,36 @@ export default function SuperAdminDashboard() {
       body: JSON.stringify({ status: nextStatus })
     });
     loadTenants();
+  };
+
+  const handleUpdateTenant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTenant) return;
+    try {
+      const res = await fetch(`/api/admin/tenants/${editingTenant.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editingTenant.name,
+          contact_email: editingTenant.contact_email,
+          contact_phone: editingTenant.contact_phone,
+          gateway_account_id: editingTenant.gateway_account_id,
+          default_platform_fee: editingTenant.default_platform_fee,
+          fee_bearer_type: editingTenant.fee_bearer_type,
+          status: editingTenant.status
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setEditingTenant(null);
+        loadTenants();
+        setSuccessMsg(`Tenant '${editingTenant.name}' updated successfully!`);
+      } else {
+        setErrorMsg(json.error || 'Failed to update tenant');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error updating tenant');
+    }
   };
 
   const handleSaveSettings = async () => {
@@ -625,7 +657,7 @@ export default function SuperAdminDashboard() {
                     <tr style={{ borderBottom: '1px solid var(--border-glass)', textAlign: 'left', color: 'var(--text-dim)' }}>
                       <th style={{ padding: 10 }}>Organizer Name</th>
                       <th style={{ padding: 10 }}>Slug / Box Office</th>
-                      <th style={{ padding: 10 }}>Merchant UPI ID</th>
+                      <th style={{ padding: 10 }}>Organizer WhatsApp</th>
                       <th style={{ padding: 10 }}>Fee Bearer</th>
                       <th style={{ padding: 10 }}>Platform Cut</th>
                       <th style={{ padding: 10 }}>Status</th>
@@ -637,7 +669,11 @@ export default function SuperAdminDashboard() {
                       <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                         <td style={{ padding: 12 }}><b>{t.name}</b></td>
                         <td style={{ padding: 12 }}><a href={`/${t.slug}`} target="_blank" style={{ color: '#818cf8' }}>/{t.slug} ↗</a></td>
-                        <td style={{ padding: 12 }}><code>{t.gateway_account_id || 'Default UPI MID'}</code></td>
+                        <td style={{ padding: 12 }}>
+                          <span style={{ color: '#38bdf8', fontWeight: 600 }}>
+                            {t.contact_phone || 'Not set'}
+                          </span>
+                        </td>
                         <td style={{ padding: 12 }}>
                           <span className={`badge ${t.fee_bearer_type === 'USER' ? 'badge-purple' : 'badge-yellow'}`}>
                             {t.fee_bearer_type === 'USER' ? 'Client Pays Surcharge' : 'Organizer Absorbs'}
@@ -648,12 +684,21 @@ export default function SuperAdminDashboard() {
                           <span className={`badge ${t.status === 'ACTIVE' ? 'badge-green' : 'badge-red'}`}>{t.status}</span>
                         </td>
                         <td style={{ padding: 12 }}>
-                          <button
-                            className={`btn btn-sm ${t.status === 'ACTIVE' ? 'btn-danger' : 'btn-success'}`}
-                            onClick={() => toggleTenantStatus(t.id, t.status)}
-                          >
-                            {t.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
-                          </button>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => setEditingTenant({ ...t })}
+                              title="Edit Organizer Details"
+                            >
+                              ✏️ Edit
+                            </button>
+                            <button
+                              className={`btn btn-sm ${t.status === 'ACTIVE' ? 'btn-danger' : 'btn-success'}`}
+                              onClick={() => toggleTenantStatus(t.id, t.status)}
+                            >
+                              {t.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -849,6 +894,98 @@ export default function SuperAdminDashboard() {
               <div className="modal-footer" style={{ flexShrink: 0 }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Create Tenant &amp; Account</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Tenant Modal */}
+      {editingTenant && (
+        <div className="modal-backdrop">
+          <div className="modal-dialog" style={{ maxWidth: 540 }}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Edit Organizer Tenant ({editingTenant.slug})</h3>
+              <button onClick={() => setEditingTenant(null)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.2rem', cursor: 'pointer' }}>&times;</button>
+            </div>
+            <form onSubmit={handleUpdateTenant}>
+              <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                <div className="form-group">
+                  <label className="form-label">Organizer / Brand Name *</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={editingTenant.name || ''}
+                    onChange={(e) => setEditingTenant({ ...editingTenant, name: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Organizer WhatsApp Phone Number *</label>
+                  <input
+                    type="tel"
+                    className="form-control"
+                    placeholder="e.g. 7054916134"
+                    value={editingTenant.contact_phone || ''}
+                    onChange={(e) => setEditingTenant({ ...editingTenant, contact_phone: e.target.value })}
+                    required
+                  />
+                  <small style={{ color: '#38bdf8', fontSize: '0.72rem', marginTop: 3 }}>
+                    Receives real-time PAYMENT_CONFIRMATION_TO_ORGANIZER WhatsApp alerts upon customer payments.
+                  </small>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Organizer Contact Email</label>
+                  <input
+                    type="email"
+                    className="form-control"
+                    value={editingTenant.contact_email || ''}
+                    onChange={(e) => setEditingTenant({ ...editingTenant, contact_email: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Super Admin Platform Fee per Ticket (in Paise)</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={editingTenant.default_platform_fee || 0}
+                    onChange={(e) => setEditingTenant({ ...editingTenant, default_platform_fee: parseInt(e.target.value, 10) || 0 })}
+                  />
+                  <small style={{ color: 'var(--text-dim)', fontSize: '0.72rem', marginTop: 3 }}>
+                    200 paise = ₹2.00 fixed deduction per ticket.
+                  </small>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Fee Bearer Rule</label>
+                  <select
+                    className="form-control"
+                    value={editingTenant.fee_bearer_type || 'USER'}
+                    onChange={(e) => setEditingTenant({ ...editingTenant, fee_bearer_type: e.target.value })}
+                  >
+                    <option value="USER">Customer (Add Convenience Fee)</option>
+                    <option value="ORGANIZER">Organizer (Absorb Fee in Payout)</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Tenant Status</label>
+                  <select
+                    className="form-control"
+                    value={editingTenant.status || 'ACTIVE'}
+                    onChange={(e) => setEditingTenant({ ...editingTenant, status: e.target.value })}
+                  >
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="SUSPENDED">SUSPENDED</option>
+                  </select>
+                </div>
+              </div>
+              <div className="modal-footer" style={{ flexShrink: 0 }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setEditingTenant(null)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Save Tenant Changes</button>
               </div>
             </form>
           </div>

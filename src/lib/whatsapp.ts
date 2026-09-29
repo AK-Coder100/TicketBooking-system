@@ -324,3 +324,74 @@ If you have already paid or believe this is an error, please reach out to event 
 
   return sendWhatsAppTextMessage({ toPhone, messageText });
 }
+
+export async function sendWhatsAppOrganizerPaymentNotification({
+  orderId,
+  organizerPhone
+}: {
+  orderId: string;
+  organizerPhone?: string;
+}) {
+  try {
+    const order: any = await db.prepare(`
+      SELECT o.*, t.name as tenant_name, t.slug as tenant_slug,
+             t.contact_phone as tenant_organizer_phone,
+             COALESCE(e.title, o.event_title, 'Live Event') as event_title,
+             (SELECT COUNT(*) FROM tickets tk WHERE tk.order_id = o.id) as ticket_count
+      FROM orders o
+      JOIN tenants t ON o.tenant_id = t.id
+      LEFT JOIN ticket_tiers tt ON o.tier_id = tt.id
+      LEFT JOIN events e ON tt.event_id = e.id
+      WHERE o.id = ?
+    `).get(orderId);
+
+    if (!order) return { success: false, error: 'Order not found' };
+
+    const rawPhone = organizerPhone || order.tenant_organizer_phone || process.env.ORGANIZER_PHONE || '7054916134';
+    const cleanPhone = normalizePhoneForService(rawPhone);
+    const queueId = `wa_org_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+
+    const amountFormatted = `₹${((order.total_charged || order.total_base_price || 0) / 100).toFixed(2)}`;
+    const ticketCount = order.ticket_count || 1;
+    const txnId = order.gateway_payment_id || order.payment_reference || 'Confirmed';
+
+    const messageText =
+      `🎉 *Payment Received & Confirmed!*\n\n• *Tenant / Organizer:* ${order.tenant_name}\n• *Event:* ${order.event_title}\n• *Booking ID:* ${order.id}\n• *Customer:* ${order.customer_name || 'Customer'} (${order.customer_phone || ''})\n• *Amount Paid:* ${amountFormatted}\n• *Passes Issued:* ${ticketCount} Ticket(s)\n• *Paytm Txn ID:* ${txnId}\n• *Time:* ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`;
+
+    const payloadObj = {
+      msg_type: 'PAYMENT_CONFIRMATION_TO_ORGANIZER',
+      phone: cleanPhone,
+      order_id: order.id,
+      tenant_name: order.tenant_name,
+      event_title: order.event_title,
+      customer_name: order.customer_name,
+      customer_phone: order.customer_phone,
+      amount_charged_paise: order.total_charged,
+      ticket_count: ticketCount,
+      txn_id: txnId
+    };
+
+    await db.prepare(`
+      INSERT INTO whatsapp_msg_in_queue (
+        id, phone, msg_type, order_id, attendee_name, ticket_type,
+        venue, caption, message_text, payload, status, created_at
+      ) VALUES (?, ?, 'PAYMENT_CONFIRMATION_TO_ORGANIZER', ?, ?, ?, ?, ?, ?, ?, 'PENDING', NOW())
+    `).run(
+      queueId,
+      cleanPhone,
+      order.id,
+      order.customer_name,
+      order.event_title,
+      order.tenant_name,
+      messageText,
+      messageText,
+      JSON.stringify(payloadObj)
+    );
+
+    console.log(`[WhatsApp Queue] Enqueued PAYMENT_CONFIRMATION_TO_ORGANIZER ${queueId} for phone ${cleanPhone}`);
+    return { success: true, queueId };
+  } catch (err: any) {
+    console.error('[WhatsApp Organizer Notification Exception]:', err);
+    return { success: false, error: err.message };
+  }
+}

@@ -228,6 +228,10 @@ export async function initSchema(): Promise<void> {
       ALTER TABLE ticket_audit_logs DROP CONSTRAINT IF EXISTS ticket_audit_logs_action_type_check;
       ALTER TABLE ticket_audit_logs ADD CONSTRAINT ticket_audit_logs_action_type_check CHECK (action_type IN ('WHATSAPP_SENT', 'DOWNLOADED', 'SCAN_ATTEMPT', 'OVERRIDE_CHECKIN', 'MANUAL_CHECKIN', 'RESET_CHECKIN'));
 
+      -- Ensure tenants table has organizer_phone column
+      ALTER TABLE tenants ADD COLUMN IF NOT EXISTS organizer_phone VARCHAR(50);
+      ALTER TABLE tenants ADD COLUMN IF NOT EXISTS contact_phone VARCHAR(50);
+
       -- WhatsApp Messages Queue table (for external microservice polling/processing)
       CREATE TABLE IF NOT EXISTS whatsapp_msg_in_queue (
         id VARCHAR(100) PRIMARY KEY,
