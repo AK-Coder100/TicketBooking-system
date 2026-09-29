@@ -347,9 +347,17 @@ export async function sendWhatsAppOrganizerPaymentNotification({
 
     if (!order) return { success: false, error: 'Order not found' };
 
-    const rawPhone = organizerPhone || order.tenant_organizer_phone || process.env.ORGANIZER_PHONE || '7054916134';
-    const cleanPhone = normalizePhoneForService(rawPhone);
-    const queueId = `wa_org_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const rawPhoneString = organizerPhone || order.tenant_organizer_phone || process.env.ORGANIZER_PHONE || '7054916134';
+    
+    // Split by comma, semicolon, space, or newline and deduplicate
+    const rawPhones = String(rawPhoneString)
+      .split(/[,;\s\n]+/)
+      .map(p => p.trim())
+      .filter(p => p.length >= 8);
+
+    // Limit to max 5 numbers
+    const uniquePhones = Array.from(new Set(rawPhones)).slice(0, 5);
+    if (uniquePhones.length === 0) uniquePhones.push('7054916134');
 
     const amountFormatted = `₹${((order.total_charged || order.total_base_price || 0) / 100).toFixed(2)}`;
     const ticketCount = order.ticket_count || 1;
@@ -358,38 +366,47 @@ export async function sendWhatsAppOrganizerPaymentNotification({
     const messageText =
       `🎉 *Payment Received & Confirmed!*\n\n• *Tenant / Organizer:* ${order.tenant_name}\n• *Event:* ${order.event_title}\n• *Booking ID:* ${order.id}\n• *Customer:* ${order.customer_name || 'Customer'} (${order.customer_phone || ''})\n• *Amount Paid:* ${amountFormatted}\n• *Passes Issued:* ${ticketCount} Ticket(s)\n• *Paytm Txn ID:* ${txnId}\n• *Time:* ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`;
 
-    const payloadObj = {
-      msg_type: 'PAYMENT_CONFIRMATION_TO_ORGANIZER',
-      phone: cleanPhone,
-      order_id: order.id,
-      tenant_name: order.tenant_name,
-      event_title: order.event_title,
-      customer_name: order.customer_name,
-      customer_phone: order.customer_phone,
-      amount_charged_paise: order.total_charged,
-      ticket_count: ticketCount,
-      txn_id: txnId
-    };
+    const queuedIds: string[] = [];
 
-    await db.prepare(`
-      INSERT INTO whatsapp_msg_in_queue (
-        id, phone, msg_type, order_id, attendee_name, ticket_type,
-        venue, caption, message_text, payload, status, created_at
-      ) VALUES (?, ?, 'PAYMENT_CONFIRMATION_TO_ORGANIZER', ?, ?, ?, ?, ?, ?, ?, 'PENDING', NOW())
-    `).run(
-      queueId,
-      cleanPhone,
-      order.id,
-      order.customer_name,
-      order.event_title,
-      order.tenant_name,
-      messageText,
-      messageText,
-      JSON.stringify(payloadObj)
-    );
+    for (const phone of uniquePhones) {
+      const cleanPhone = normalizePhoneForService(phone);
+      const queueId = `wa_org_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
 
-    console.log(`[WhatsApp Queue] Enqueued PAYMENT_CONFIRMATION_TO_ORGANIZER ${queueId} for phone ${cleanPhone}`);
-    return { success: true, queueId };
+      const payloadObj = {
+        msg_type: 'PAYMENT_CONFIRMATION_TO_ORGANIZER',
+        phone: cleanPhone,
+        order_id: order.id,
+        tenant_name: order.tenant_name,
+        event_title: order.event_title,
+        customer_name: order.customer_name,
+        customer_phone: order.customer_phone,
+        amount_charged_paise: order.total_charged,
+        ticket_count: ticketCount,
+        txn_id: txnId
+      };
+
+      await db.prepare(`
+        INSERT INTO whatsapp_msg_in_queue (
+          id, phone, msg_type, order_id, attendee_name, ticket_type,
+          venue, caption, message_text, payload, status, created_at
+        ) VALUES (?, ?, 'PAYMENT_CONFIRMATION_TO_ORGANIZER', ?, ?, ?, ?, ?, ?, ?, 'PENDING', NOW())
+      `).run(
+        queueId,
+        cleanPhone,
+        order.id,
+        order.customer_name,
+        order.event_title,
+        order.tenant_name,
+        messageText,
+        messageText,
+        JSON.stringify(payloadObj)
+      );
+
+      console.log(`[WhatsApp Queue] Enqueued PAYMENT_CONFIRMATION_TO_ORGANIZER ${queueId} for organizer phone ${cleanPhone}`);
+      queuedIds.push(queueId);
+    }
+
+    return { success: true, queuedIds, phoneCount: uniquePhones.length };
   } catch (err: any) {
     console.error('[WhatsApp Organizer Notification Exception]:', err);
     return { success: false, error: err.message };

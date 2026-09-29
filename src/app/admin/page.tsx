@@ -839,30 +839,17 @@ export default function SuperAdminDashboard() {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Organizer WhatsApp / Contact Phone</label>
-                  <input
-                    type="tel"
-                    className="form-control"
-                    placeholder="e.g. +919918327131"
-                    value={newTenant.contact_phone}
-                    onChange={(e) => setNewTenant({ ...newTenant, contact_phone: e.target.value })}
-                  />
-                  <small style={{ color: 'var(--text-dim)', fontSize: '0.72rem', marginTop: 3 }}>
-                    Receives real-time WhatsApp booking alerts when customers place ticket orders.
-                  </small>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Organizer Merchant UPI ID / VPA (Optional)</label>
+                  <label className="form-label">Organizer WhatsApp Phone Number(s) (Up to 5 numbers, comma-separated) *</label>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="e.g. srproduction@upi or BHARATPE.8J0S0Z9W9S44900@FBPE"
-                    value={newTenant.gateway_account_id}
-                    onChange={(e) => setNewTenant({ ...newTenant, gateway_account_id: e.target.value })}
+                    placeholder="e.g. 7054916134, 7991665396"
+                    value={newTenant.contact_phone}
+                    onChange={(e) => setNewTenant({ ...newTenant, contact_phone: e.target.value })}
+                    required
                   />
-                  <small style={{ color: 'var(--text-dim)', fontSize: '0.72rem', marginTop: 3 }}>
-                    Direct UPI MID for customer payments. Leave empty to use system default UPI ID.
+                  <small style={{ color: '#38bdf8', fontSize: '0.72rem', marginTop: 3 }}>
+                    Add up to 5 numbers separated by commas. Each number receives PAYMENT_CONFIRMATION_TO_ORGANIZER alerts.
                   </small>
                 </div>
 
@@ -922,17 +909,17 @@ export default function SuperAdminDashboard() {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Organizer WhatsApp Phone Number *</label>
+                  <label className="form-label">Organizer WhatsApp Phone Number(s) (Up to 5 numbers, comma-separated) *</label>
                   <input
-                    type="tel"
+                    type="text"
                     className="form-control"
-                    placeholder="e.g. 7054916134"
+                    placeholder="e.g. 7054916134, 7991665396"
                     value={editingTenant.contact_phone || ''}
                     onChange={(e) => setEditingTenant({ ...editingTenant, contact_phone: e.target.value })}
                     required
                   />
                   <small style={{ color: '#38bdf8', fontSize: '0.72rem', marginTop: 3 }}>
-                    Receives real-time PAYMENT_CONFIRMATION_TO_ORGANIZER WhatsApp alerts upon customer payments.
+                    Add up to 5 numbers separated by commas. Each number receives PAYMENT_CONFIRMATION_TO_ORGANIZER alerts.
                   </small>
                 </div>
 
