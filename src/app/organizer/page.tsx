@@ -783,28 +783,24 @@ function OrganizerDashboardInner() {
 
   // ── Metrics Calculations ──────────────────────────────────────────────────
   const activeEvent = events.find(e => e.id === selectedEventId) || events[0] || null;
-  const totalSessionsCount = events.reduce((acc, ev) => acc + (ev.sessions?.length || ev.session_count || 1), 0);
+  const totalSessionsCount = events.reduce((acc, ev) => acc + (ev.sessions?.length || ev.session_count || 0), 0);
 
-  const totalConfirmedTickets = stats.totalTickets ?? (attendees.length > 0 ? attendees.length : 248);
-  const totalCheckedIn = stats.checkedInCount ?? attendees.filter(a => parseInt(a.checkin_count || '0', 10) > 0).length;
-  const admittedPct = totalConfirmedTickets > 0 ? ((totalCheckedIn / totalConfirmedTickets) * 100).toFixed(1) : '45.2';
+  const totalConfirmedTickets = stats.totalTickets !== undefined ? stats.totalTickets : attendees.length;
+  const totalCheckedIn = stats.checkedInCount !== undefined ? stats.checkedInCount : attendees.filter(a => parseInt(a.checkin_count || '0', 10) > 0).length;
+  const admittedPct = totalConfirmedTickets > 0 ? ((totalCheckedIn / totalConfirmedTickets) * 100).toFixed(1) : '0.0';
 
   // Gate breakdown calculations
-  const gate1Admitted = attendees.length > 0
-    ? attendees.filter(a => parseInt(a.checkin_count || '0', 10) > 0 && !a.tier_name?.toLowerCase().includes('vip')).length
-    : 78;
-  const gate2Admitted = attendees.length > 0
-    ? attendees.filter(a => parseInt(a.checkin_count || '0', 10) > 0 && a.tier_name?.toLowerCase().includes('vip')).length
-    : 34;
+  const gate1Admitted = attendees.filter(a => parseInt(a.checkin_count || '0', 10) > 0 && !a.tier_name?.toLowerCase().includes('vip')).length;
+  const gate2Admitted = attendees.filter(a => parseInt(a.checkin_count || '0', 10) > 0 && a.tier_name?.toLowerCase().includes('vip')).length;
   const pendingCount = Math.max(0, totalConfirmedTickets - (gate1Admitted + gate2Admitted));
 
   // Gross revenue calculation
-  const grossValNum = parseFloat(stats.grossRevenueRupees || '184000');
+  const grossValNum = parseFloat(stats.grossRevenueRupees || '0');
   const grossFormatted = grossValNum >= 100000
     ? `₹${(grossValNum / 100000).toFixed(2)}L`
     : `₹${grossValNum.toLocaleString('en-IN')}`;
 
-  const tenantName = userProfile?.tenant?.name || 'SR Production & RB Garment Enterprises';
+  const tenantName = userProfile?.tenant?.name || 'Organizer Workspace';
 
   // ───────────────────────────────────────────────────────────────────────────
   //  RENDER
@@ -1208,7 +1204,7 @@ function OrganizerDashboardInner() {
                   {grossFormatted}
                 </div>
                 <div style={{ fontSize: '0.78rem', color: '#fbbf24', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  Gorakhpur Bookings
+                  {activeEvent ? `${activeEvent.title.length > 22 ? activeEvent.title.slice(0, 20) + '...' : activeEvent.title} Revenue` : 'Gross Revenue'}
                 </div>
               </div>
             </div>
@@ -1247,7 +1243,7 @@ function OrganizerDashboardInner() {
                 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#fbbf24', flexShrink: 0, marginTop: 5 }}></span>
                   <div style={{ lineHeight: 1.4 }}>
-                    <strong style={{ color: '#ffffff' }}>Peak Rush Window:</strong> Expected between 20:00 and 21:30. Ensure both Gate 1 lanes are staffed with handheld scanners.
+                    <strong style={{ color: '#ffffff' }}>Peak Rush Window:</strong> Ensure gate lanes are staffed with handheld QR scanners during peak arrival times.
                   </div>
                 </div>
 
@@ -1265,7 +1261,7 @@ function OrganizerDashboardInner() {
                 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#34d399', flexShrink: 0, marginTop: 5 }}></span>
                   <div style={{ lineHeight: 1.4 }}>
-                    <strong style={{ color: '#ffffff' }}>Offline Mode Enabled:</strong> Scanners validate against encrypted local ticket tables to avoid bandwidth drops at Town Hall.
+                    <strong style={{ color: '#ffffff' }}>Instant Validation:</strong> Scanners validate tickets in real-time with duplicate check-in prevention.
                   </div>
                 </div>
 
@@ -1283,7 +1279,7 @@ function OrganizerDashboardInner() {
                 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#a855f7', flexShrink: 0, marginTop: 5 }}></span>
                   <div style={{ lineHeight: 1.4 }}>
-                    <strong style={{ color: '#ffffff' }}>Dandiya Sticks Security:</strong> Collect security tags for festival equipment at exit checkpoints.
+                    <strong style={{ color: '#ffffff' }}>Audit Logging:</strong> Every scan, check-in, and manual override is recorded in the immutable audit trail.
                   </div>
                 </div>
               </div>
