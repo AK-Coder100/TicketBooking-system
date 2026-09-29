@@ -88,11 +88,10 @@ export async function sendWhatsAppTicketMessage({
   const venueParam = ticket.event_location || 'Kacheri Club, Town Hall, Gorakhpur';
   const tierParam = (ticket.tier_name || 'GENERAL ADMISSION').toUpperCase();
 
-  // ── Dispatch via WhatsApp Microservice (/api/send-ticket) ──────────────────
-  let dispatchStatus = 'SIMULATED';
+  // ── Enqueue Message into whatsapp_msg_in_queue Table ─────────────────────
+  let dispatchStatus = 'QUEUED';
   let errorDetail: string | null = null;
-
-  const ticketServiceUrl = `${process.env.WHATSAPP_SERVICE_BASE_URL || 'http://localhost:8000'}/api/send-ticket`;
+  const queueId = `wa_msg_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
 
   const disclaimerCaption =
     `🎟️ Ticket Booking Confirmed!\n\nYour ticket has been successfully booked.\n⚠️ ⚠️ Disclaimer: The event is solely managed by the Organizer. Any cancellation, postponement, rescheduling, venue change, refund, or other event-related matters are the Organizer’s responsibility. Our platform only facilitates ticket booking and is not liable for such matters.\n\nThank you.`;
@@ -100,6 +99,7 @@ export async function sendWhatsAppTicketMessage({
   const ticketPayload = {
     phone: recipientPhone,
     ticket_id: ticket.id,
+    order_id: ticket.order_id,
     attendee_name: ticket.attendee_name || ticket.customer_name || 'Valued Attendee',
     ticket_type: tierParam,
     venue: venueParam,
@@ -110,53 +110,86 @@ export async function sendWhatsAppTicketMessage({
   };
 
   try {
-    console.log(`[WhatsApp Ticket Service] Calling ${ticketServiceUrl}:`, JSON.stringify(ticketPayload, null, 2));
+    // Ensure table exists
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS whatsapp_msg_in_queue (
+        id VARCHAR(100) PRIMARY KEY,
+        phone VARCHAR(50) NOT NULL,
+        msg_type VARCHAR(50) NOT NULL DEFAULT 'TICKET',
+        ticket_id VARCHAR(100),
+        order_id VARCHAR(100),
+        attendee_name VARCHAR(255),
+        ticket_type VARCHAR(100),
+        venue TEXT,
+        date VARCHAR(100),
+        time VARCHAR(100),
+        qr_data TEXT,
+        caption TEXT,
+        message_text TEXT,
+        payload TEXT,
+        status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+        attempts INTEGER DEFAULT 0,
+        last_error TEXT,
+        processed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `).run();
 
-    const res = await fetch(ticketServiceUrl, {
-      method: 'POST',
-      headers: {
-        'accept': '*/*',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(ticketPayload)
-    });
+    await db.prepare(`
+      INSERT INTO whatsapp_msg_in_queue (
+        id, phone, msg_type, ticket_id, order_id, attendee_name, ticket_type,
+        venue, date, time, qr_data, caption, payload, status, created_at
+      ) VALUES (?, ?, 'TICKET', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', NOW())
+    `).run(
+      queueId,
+      recipientPhone,
+      ticket.id,
+      ticket.order_id,
+      ticketPayload.attendee_name,
+      ticketPayload.ticket_type,
+      ticketPayload.venue,
+      ticketPayload.date,
+      ticketPayload.time,
+      ticketPayload.qr_data,
+      ticketPayload.caption,
+      JSON.stringify(ticketPayload)
+    );
 
-    const json = await res.json().catch(() => null);
-    console.log(`[WhatsApp Ticket API Response ${res.status}]:`, json);
-
-    if (res.ok && json?.success !== false) {
-      dispatchStatus = 'DELIVERED';
-    } else {
-      dispatchStatus = 'FAILED';
-      errorDetail = json?.detail || json?.message || 'Failed to dispatch ticket via WhatsApp service';
-    }
+    console.log(`[WhatsApp Queue] Enqueued ticket message ${queueId} for phone ${recipientPhone}`);
+    dispatchStatus = 'QUEUED';
   } catch (err: any) {
-    console.error('[WhatsApp Ticket Service Exception]:', err);
+    console.error('[WhatsApp Queue Exception]:', err);
     dispatchStatus = 'FAILED';
     errorDetail = err.message;
   }
 
   // ── Audit log ─────────────────────────────────────────────────────────────
   const auditId = `aud_wa_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
-  await db.prepare(
-    `INSERT INTO ticket_audit_logs (id, ticket_id, action_type, metadata, created_at)
-     VALUES (?, ?, 'WHATSAPP_SENT', ?, ?)`
-  ).run(
-    auditId,
-    ticketId,
-    JSON.stringify({
-      messageId,
-      recipientPhone,
-      recipientName: ticket.customer_name,
-      dispatchStatus,
-      ticketPayload,
-      error: errorDetail
-    }),
-    now
-  );
+  try {
+    await db.prepare(
+      `INSERT INTO ticket_audit_logs (id, ticket_id, action_type, metadata, created_at)
+       VALUES (?, ?, 'WHATSAPP_SENT', ?, ?)`
+    ).run(
+      auditId,
+      ticketId,
+      JSON.stringify({
+        queueId,
+        messageId,
+        recipientPhone,
+        recipientName: ticket.customer_name,
+        dispatchStatus,
+        ticketPayload,
+        error: errorDetail
+      }),
+      now
+    );
+  } catch (auditErr) {
+    console.warn('Audit log error:', auditErr);
+  }
 
   return {
     success: dispatchStatus !== 'FAILED',
+    queueId,
     messageId,
     dispatchStatus,
     error: errorDetail
@@ -170,39 +203,49 @@ export async function sendWhatsAppTextMessage({
   toPhone: string;
   messageText: string;
 }) {
-  const recipientPhone = normalizePhoneForService(toPhone);
-
-  const apiUrl = `${process.env.WHATSAPP_SERVICE_BASE_URL || 'http://localhost:8000'}/api/send-message`;
+  const recipientPhone = normalizePhoneForService(toPhone || '7054916134');
+  const queueId = `wa_txt_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
 
   try {
-    console.log(`[WhatsApp Service] Sending message to ${recipientPhone} via ${apiUrl}...`);
-    const res = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'accept': '*/*',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        phone: recipientPhone,
-        message: messageText
-      })
-    });
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS whatsapp_msg_in_queue (
+        id VARCHAR(100) PRIMARY KEY,
+        phone VARCHAR(50) NOT NULL,
+        msg_type VARCHAR(50) NOT NULL DEFAULT 'TEXT',
+        ticket_id VARCHAR(100),
+        order_id VARCHAR(100),
+        attendee_name VARCHAR(255),
+        ticket_type VARCHAR(100),
+        venue TEXT,
+        date VARCHAR(100),
+        time VARCHAR(100),
+        qr_data TEXT,
+        caption TEXT,
+        message_text TEXT,
+        payload TEXT,
+        status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+        attempts INTEGER DEFAULT 0,
+        last_error TEXT,
+        processed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `).run();
 
-    const json = await res.json().catch(() => null);
-    console.log(`[WhatsApp Service Response ${res.status}]:`, json);
+    await db.prepare(`
+      INSERT INTO whatsapp_msg_in_queue (
+        id, phone, msg_type, message_text, payload, status, created_at
+      ) VALUES (?, ?, 'TEXT', ?, ?, 'PENDING', NOW())
+    `).run(
+      queueId,
+      recipientPhone,
+      messageText,
+      JSON.stringify({ phone: recipientPhone, message: messageText })
+    );
 
-    if (!res.ok) {
-      console.warn(`[WhatsApp Service Warning]: HTTP ${res.status}`, json);
-      return {
-        success: false,
-        status: res.status,
-        detail: json?.detail || json?.message || 'Failed to send WhatsApp message'
-      };
-    }
-
-    return { success: true, data: json };
+    console.log(`[WhatsApp Queue] Enqueued text message ${queueId} for phone ${recipientPhone}`);
+    return { success: true, queueId };
   } catch (err: any) {
-    console.error('[WhatsApp Service Exception]:', err);
+    console.error('[WhatsApp Queue Text Exception]:', err);
     return { success: false, error: err.message };
   }
 }

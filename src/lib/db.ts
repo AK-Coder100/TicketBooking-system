@@ -227,6 +227,31 @@ export async function initSchema(): Promise<void> {
       -- Update ticket_audit_logs check constraint to support all organizer action types
       ALTER TABLE ticket_audit_logs DROP CONSTRAINT IF EXISTS ticket_audit_logs_action_type_check;
       ALTER TABLE ticket_audit_logs ADD CONSTRAINT ticket_audit_logs_action_type_check CHECK (action_type IN ('WHATSAPP_SENT', 'DOWNLOADED', 'SCAN_ATTEMPT', 'OVERRIDE_CHECKIN', 'MANUAL_CHECKIN', 'RESET_CHECKIN'));
+
+      -- WhatsApp Messages Queue table (for external microservice polling/processing)
+      CREATE TABLE IF NOT EXISTS whatsapp_msg_in_queue (
+        id VARCHAR(100) PRIMARY KEY,
+        phone VARCHAR(50) NOT NULL,
+        msg_type VARCHAR(50) NOT NULL DEFAULT 'TICKET',
+        ticket_id VARCHAR(100),
+        order_id VARCHAR(100),
+        attendee_name VARCHAR(255),
+        ticket_type VARCHAR(100),
+        venue TEXT,
+        date VARCHAR(100),
+        time VARCHAR(100),
+        qr_data TEXT,
+        caption TEXT,
+        message_text TEXT,
+        payload TEXT,
+        status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+        attempts INTEGER DEFAULT 0,
+        last_error TEXT,
+        processed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_wa_queue_status ON whatsapp_msg_in_queue(status);
+      CREATE INDEX IF NOT EXISTS idx_wa_queue_phone ON whatsapp_msg_in_queue(phone);
     `);
 
     await seedData();
