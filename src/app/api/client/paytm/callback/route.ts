@@ -88,6 +88,8 @@ async function handlePaytmCallbackData(request: NextRequest, isGetMethod = false
   // Determine success from callback verification or query Paytm Status API directly as authoritative backup
   let isSuccessful = verification.isSuccess;
   let finalTxnId = verification.txnId || postData.TXNID || postData.txnId || '';
+  // Track whether Paytm gave us a definitive failure answer (vs. inconclusive/network error)
+  let isDefinitiveFailure = false;
 
   if (!isSuccessful) {
     try {
@@ -95,9 +97,17 @@ async function handlePaytmCallbackData(request: NextRequest, isGetMethod = false
       if (statusCheck.success) {
         isSuccessful = true;
         finalTxnId = statusCheck.txnId || finalTxnId;
+      } else if (statusCheck.status && statusCheck.status !== 'UNKNOWN') {
+        // Paytm gave a definitive failure status (e.g. TXN_FAILURE, PENDING)
+        // Only mark FAILED if Paytm explicitly reports failure — not on UNKNOWN/network errors
+        const definitivelyFailed = ['TXN_FAILURE', 'FAILED', 'CANCELLED', 'FRAUD'].includes(statusCheck.status?.toUpperCase());
+        isDefinitiveFailure = definitivelyFailed;
       }
+      // If statusCheck.status === 'UNKNOWN' or similar, isDefinitiveFailure stays false
+      // so we leave the order PENDING for later reconciliation
     } catch (statusErr) {
       console.warn('Paytm server-to-server status check error:', statusErr);
+      // On error, leave PENDING — do NOT mark as FAILED
     }
   }
 
@@ -172,9 +182,9 @@ async function handlePaytmCallbackData(request: NextRequest, isGetMethod = false
     // 5. Redirect back to checkout confirmation screen over HTTPS
     const redirectUrl = `${origin}/${tenantSlug}/checkout?orderId=${encodeURIComponent(orderId)}&paymentStatus=PAID&txnId=${encodeURIComponent(finalTxnId)}`;
     return NextResponse.redirect(redirectUrl, { status: 303 });
-  } else {
-    // Payment Failed
-    console.warn(`Paytm payment failed for order ${orderId}:`, verification.respMsg);
+  } else if (isDefinitiveFailure) {
+    // Paytm explicitly confirmed failure — safe to mark as FAILED
+    console.warn(`Paytm payment definitively failed for order ${orderId}:`, verification.respMsg);
     await db.prepare(`
       UPDATE orders
       SET payment_status = 'FAILED',
@@ -183,6 +193,12 @@ async function handlePaytmCallbackData(request: NextRequest, isGetMethod = false
     `).run(`FAILED: ${verification.respMsg || 'Paytm Verification Failed'}`, orderId);
 
     const redirectUrl = `${origin}/${tenantSlug}/checkout?orderId=${encodeURIComponent(orderId)}&paymentStatus=FAILED&error=${encodeURIComponent(verification.respMsg || 'Payment Failed or Cancelled')}`;
+    return NextResponse.redirect(redirectUrl, { status: 303 });
+  } else {
+    // Inconclusive — checksum mismatch or Paytm status API unreachable.
+    // Leave order as PENDING so it can be reconciled later via admin panel or batch job.
+    console.warn(`Paytm payment inconclusive for order ${orderId} — leaving PENDING for reconciliation.`, verification.respMsg);
+    const redirectUrl = `${origin}/${tenantSlug}/checkout?orderId=${encodeURIComponent(orderId)}&paymentStatus=PENDING&error=${encodeURIComponent('Payment verification pending. If you paid, please wait — your tickets will be dispatched shortly.')}`;
     return NextResponse.redirect(redirectUrl, { status: 303 });
   }
 }
