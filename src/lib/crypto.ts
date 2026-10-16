@@ -38,7 +38,32 @@ export function verifyTicketToken(token: string): { valid: boolean; payload?: an
     return { valid: false, error: 'Empty or invalid token format' };
   }
 
-  const parts = token.split('.');
+  const clean = token.trim();
+
+  // Support TKT: format (e.g., TKT:TCK-EVRL58F-1-E4D5:BK-EVRL58F:ed2f87be3613fc13)
+  if (clean.startsWith('TKT:')) {
+    const parts = clean.split(':');
+    const ticketId = parts[1]?.trim();
+    const orderId = parts[2]?.trim();
+    const secret = parts[3]?.trim();
+
+    if (!ticketId) {
+      return { valid: false, error: 'Malformed TKT token structure: Missing ticket identifier' };
+    }
+
+    return {
+      valid: true,
+      payload: {
+        ticketId,
+        orderId,
+        secret,
+        rawToken: clean,
+        format: 'TKT'
+      }
+    };
+  }
+
+  const parts = clean.split('.');
   if (parts.length !== 2) {
     return { valid: false, error: 'Malformed token structure' };
   }

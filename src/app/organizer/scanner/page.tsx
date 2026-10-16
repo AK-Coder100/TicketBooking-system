@@ -209,7 +209,8 @@ function ScannerContent() {
     if (!id) return;
     setProcessing(true);
     try {
-      const res = await fetch(`/api/tenant/events/${selectedEventId}/members`, {
+      const targetEventId = result?.ticket?.eventId || selectedEventId;
+      const res = await fetch(`/api/tenant/events/${targetEventId}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'OVERRIDE', ticketId: id, reason: 'Gate Override' }),
@@ -375,7 +376,7 @@ function ScannerContent() {
                     }}
                   >
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>
-                      {activeEvent?.title || 'Select Event'}
+                      {activeEvent?.title || (!selectedEventId ? '✨ All Events (Auto-Detect)' : 'Select Event')}
                     </span>
                     <span style={{
                       color: '#94a3b8',
@@ -406,6 +407,35 @@ function ScannerContent() {
                       flexDirection: 'column',
                       gap: 4,
                     }}>
+                      {events.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedEventId('');
+                            setResult(null);
+                            setEventDropdownOpen(false);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            borderRadius: 8,
+                            background: !selectedEventId ? 'rgba(99, 102, 241, 0.18)' : 'transparent',
+                            border: !selectedEventId ? '1px solid rgba(99, 102, 241, 0.35)' : '1px solid transparent',
+                            color: !selectedEventId ? '#ffffff' : '#cbd5e1',
+                            fontSize: '0.88rem',
+                            fontWeight: !selectedEventId ? 700 : 500,
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 8,
+                          }}
+                        >
+                          <span>✨ All Events (Auto-Detect)</span>
+                          {!selectedEventId && <span style={{ color: '#818cf8', fontSize: '0.8rem' }}>✓</span>}
+                        </button>
+                      )}
                       {events.map(ev => {
                         const isSelected = ev.id === selectedEventId;
                         return (

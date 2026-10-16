@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getSession();
     const body = await request.json();
-    const { qrToken, eventId, sessionId, expectedSessionId, deviceInfo } = body;
+    const { qrToken, eventId, expectedEventId, sessionId, expectedSessionId, deviceInfo } = body;
 
     if (!qrToken) {
       return NextResponse.json({ success: false, error: 'QR token is required' }, { status: 400 });
@@ -15,8 +15,8 @@ export async function POST(request: NextRequest) {
     const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
     const result = await verifyAndScanTicket({
       qrToken,
-      expectedEventId: eventId,
-      expectedSessionId: sessionId || expectedSessionId,
+      expectedEventId: expectedEventId || eventId,
+      expectedSessionId: expectedSessionId || sessionId,
       adminId: session?.name || session?.email || 'gate_scanner',
       ip,
       deviceInfo: deviceInfo || 'Mobile PWA Camera'

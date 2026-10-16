@@ -52,9 +52,9 @@ export async function GET(request: NextRequest) {
       // Use the same session engine as the gate scanner
       const sessionResult = getActiveSessionByTime(sessions, now);
 
-      // Only include events where gate is currently LIVE_NOW or UPCOMING (not all concluded)
-      if (sessionResult.status === 'NO_SESSIONS' || sessionResult.status === 'CONCLUDED') {
-        continue; // skip — no active gate window
+      // Only skip multi-session events where all sessions have completely concluded
+      if (sessions.length > 0 && sessionResult.status === 'CONCLUDED') {
+        continue; // skip — all sessions finished
       }
 
       ev.sessions = sessions;

@@ -18,39 +18,79 @@ export async function verifyAndScanTicket({
   deviceInfo?: string;
 }) {
   const now = new Date().toISOString();
+  const cleanToken = (qrToken || '').trim();
 
-  // 1. Check token validity and HMAC signature
-  const cryptoResult = verifyTicketToken(qrToken);
-  if (!cryptoResult.valid) {
+  if (!cleanToken) {
     return {
       status: 'INVALID',
       color: 'red',
-      reason: cryptoResult.error || 'Cryptographic verification failed: tampered QR payload'
+      reason: 'Empty QR code payload.'
     };
   }
 
-  const { ticketId, eventId } = cryptoResult.payload;
+  // 1. Resolve token (supports HMAC tokens, TKT: format, or direct ticket ID)
+  const cryptoResult = verifyTicketToken(cleanToken);
+  let ticketId = cryptoResult.valid ? cryptoResult.payload?.ticketId : null;
+  let orderIdFromToken = cryptoResult.valid ? cryptoResult.payload?.orderId : null;
 
   // 2. Fetch ticket with tier, session and event
-  const ticket: any = await db.prepare(`
-    SELECT t.*, o.payment_status, o.customer_phone, o.customer_email, 
-           tt.name as tier_name, tt.event_id, tt.session_id,
-           e.title as event_title,
-           es.name as session_name, es.session_date, es.start_time, es.end_time
-    FROM tickets t
-    JOIN orders o ON t.order_id = o.id
-    JOIN ticket_tiers tt ON t.tier_id = tt.id
-    JOIN events e ON tt.event_id = e.id
-    LEFT JOIN event_sessions es ON tt.session_id = es.id
-    WHERE t.id = ?
-  `).get(ticketId);
+  let ticket: any = null;
+  if (ticketId) {
+    ticket = await db.prepare(`
+      SELECT t.*, o.payment_status, o.customer_phone, o.customer_email, 
+             tt.name as tier_name, tt.event_id, tt.session_id,
+             e.title as event_title,
+             es.name as session_name, es.session_date, es.start_time, es.end_time
+      FROM tickets t
+      JOIN orders o ON t.order_id = o.id
+      JOIN ticket_tiers tt ON t.tier_id = tt.id
+      JOIN events e ON tt.event_id = e.id
+      LEFT JOIN event_sessions es ON tt.session_id = es.id
+      WHERE t.id = ? OR t.qr_secret_token = ?
+    `).get(ticketId, cleanToken);
+  } else {
+    ticket = await db.prepare(`
+      SELECT t.*, o.payment_status, o.customer_phone, o.customer_email, 
+             tt.name as tier_name, tt.event_id, tt.session_id,
+             e.title as event_title,
+             es.name as session_name, es.session_date, es.start_time, es.end_time
+      FROM tickets t
+      JOIN orders o ON t.order_id = o.id
+      JOIN ticket_tiers tt ON t.tier_id = tt.id
+      JOIN events e ON tt.event_id = e.id
+      LEFT JOIN event_sessions es ON tt.session_id = es.id
+      WHERE t.qr_secret_token = ? OR t.id = ?
+    `).get(cleanToken, cleanToken);
+  }
 
   if (!ticket) {
     return {
       status: 'INVALID',
       color: 'red',
-      reason: 'Ticket record not found in system database.'
+      reason: cryptoResult.valid
+        ? 'Ticket record not found in system database.'
+        : (cryptoResult.error || 'Ticket record not found in system database.')
     };
+  }
+
+  // Security check for TKT: format
+  if (cryptoResult.payload?.format === 'TKT') {
+    if (orderIdFromToken && ticket.order_id !== orderIdFromToken) {
+      return {
+        status: 'INVALID',
+        color: 'red',
+        reason: 'Order mismatch: QR token order ID does not match ticket record.'
+      };
+    }
+    if (ticket.qr_secret_token && ticket.qr_secret_token.startsWith('TKT:')) {
+      if (ticket.qr_secret_token !== cleanToken && !cleanToken.startsWith(`TKT:${ticket.id}:${ticket.order_id}`)) {
+        return {
+          status: 'INVALID',
+          color: 'red',
+          reason: 'Cryptographic verification failed: tampered QR secret token.'
+        };
+      }
+    }
   }
 
   if (ticket.payment_status !== 'PAID') {
@@ -78,7 +118,15 @@ export async function verifyAndScanTicket({
       status: 'WRONG_EVENT',
       color: 'red',
       reason: `Wrong Event! This ticket is for "${ticket.event_title}", not the selected event.`,
-      ticketEvent: ticket.event_title
+      ticketEvent: ticket.event_title,
+      ticket: {
+        id: ticket.id,
+        eventId: ticket.event_id,
+        attendeeName: ticket.attendee_name,
+        attendeeAge: ticket.attendee_age,
+        tierName: ticket.tier_name,
+        eventTitle: ticket.event_title
+      }
     };
   }
 
@@ -131,6 +179,7 @@ export async function verifyAndScanTicket({
       reason: `Inactive Show! This pass is valid for "${ticket.session_name || 'Show'}" (${ticket.session_date || 'scheduled date'}), but the currently active show by date & time is ${activeShowName}.`,
       ticket: {
         id: ticket.id,
+        eventId: ticket.event_id,
         attendeeName: ticket.attendee_name,
         attendeeAge: ticket.attendee_age,
         tierName: ticket.tier_name,
@@ -143,7 +192,7 @@ export async function verifyAndScanTicket({
     };
   }
 
-  // 4. Status Check: Valid (Green) vs Already Scanned (Yellow)
+  // 5. Status Check: Valid (Green) vs Already Scanned (Yellow)
   if (!ticket.checkin_count || ticket.checkin_count === 0) {
     // First scan -> GREEN (VALID)
     await db.prepare(`
@@ -169,6 +218,7 @@ export async function verifyAndScanTicket({
       message: 'Valid Ticket - Access Granted',
       ticket: {
         id: ticket.id,
+        eventId: ticket.event_id,
         attendeeName: ticket.attendee_name,
         attendeeAge: ticket.attendee_age,
         tierName: ticket.tier_name,
@@ -197,6 +247,7 @@ export async function verifyAndScanTicket({
       warning: `This ticket was previously checked in on ${new Date(ticket.checked_in_at).toLocaleString('en-IN')}.`,
       ticket: {
         id: ticket.id,
+        eventId: ticket.event_id,
         attendeeName: ticket.attendee_name,
         attendeeAge: ticket.attendee_age,
         tierName: ticket.tier_name,
