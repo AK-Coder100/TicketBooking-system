@@ -16,7 +16,21 @@ interface ScanResult {
   status: 'VALID' | 'ALREADY_SCANNED' | 'INVALID' | 'WRONG_SESSION' | 'WRONG_EVENT' | 'RE_ENTRY_ALLOWED';
   reason?: string;
   message?: string;
-  ticket?: { id: string; attendeeName: string; tierName: string; firstCheckedInAt?: string };
+  ticket?: {
+    id: string;
+    eventId?: string;
+    attendeeName?: string;
+    attendeeAge?: number;
+    tierName?: string;
+    eventTitle?: string;
+    sessionName?: string;
+    sessionDate?: string;
+    activeSessionName?: string;
+    checkedInAt?: string;
+    firstCheckedInAt?: string;
+    checkinCount?: number;
+    isOverrideAllowed?: boolean;
+  };
   canOverride?: boolean;
 }
 
